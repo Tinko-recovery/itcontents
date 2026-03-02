@@ -7,16 +7,16 @@ load_dotenv()
 
 class ContentEngine:
     def __init__(self):
-        self.ant_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        self.oa_client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        self.model = "claude-sonnet-4-6"
+        self.ant_client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        self.oa_client = openai.AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.model = "claude-3-5-sonnet-20241022" # Using a more robust model name
         self.persona = (
             "You are a High-Level Business AI Strategist. Your goal is to simplify complex AI concepts "
             "for entrepreneurs and business leaders. Your tone is professional, authoritative, but accessible. "
             "You focus on ROI, productivity, and future-proofing businesses."
         )
 
-    def generate_content(self, data):
+    async def generate_content(self, data):
         """Generates content using Title, Hook, and Category from the sheet."""
         title = data.get("title", "AI Innovation")
         hook = data.get("hook", "")
@@ -53,7 +53,7 @@ class ContentEngine:
             "[Image Prompt Text]"
         )
 
-        response = self.ant_client.messages.create(
+        response = await self.ant_client.messages.create(
             model=self.model,
             max_tokens=4000,
             messages=[
@@ -68,7 +68,7 @@ class ContentEngine:
         if parsed.get("image_prompt"):
             print(f"Generating image with prompt: {parsed['image_prompt']}")
             try:
-                img_res = self.oa_client.images.generate(
+                img_res = await self.oa_client.images.generate(
                     model="dall-e-3",
                     prompt=parsed["image_prompt"],
                     size="1024x1024",

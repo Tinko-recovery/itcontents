@@ -40,49 +40,49 @@ class ContentEngineAPP:
             json.dump(data, f)
 
     async def run_day_process(self, day):
-        """Main workflow: Sheet -> Claude -> Telegram."""
-        print(f"--- Starting Process for Day {day} (Mock: {self.mock}) ---")
-        
-        # 1. Read Topic from Google Sheet
-        if self.mock:
-            data = {
-                "title": f"Mock Title for Day {day}",
-                "hook": "This is a mock hook.",
-                "category": "Mock Testing",
-                "footer": "Mock Footer"
-            }
-        else:
-            data = self.gs_handler.get_topic_by_day(day)
+        """Standard process to run for a specific day."""
+        print(f"\n--- Processing Day {day} (Mock: {self.mock}) ---")
+        try:
+            # 1. Read Topic from Google Sheet
+            if self.mock:
+                data = {
+                    "title": f"Mock Title for Day {day}",
+                    "hook": "This is a mock hook.",
+                    "category": "Mock Testing",
+                    "footer": "Mock Footer"
+                }
+            else:
+                data = self.gs_handler.get_topic_by_day(day)
             
-        if not data:
-            print(f"Error: Could not find data for day {day}")
-            return
+            if not data:
+                print(f"No data found for Day {day}")
+                return
 
-        print(f"Topic found: {data['title']}")
+            print(f"Topic found: {data['title']}")
 
-        # 2. Generate Content via Claude
-        print("Generating content...")
-        if self.mock:
-            content = {
-                "linkedin": f"Mock LinkedIn Post for {data['title']}\n\nThis is a test post.",
-                "instagram": f"Slide 1: Welcome to {data['title']}",
-                "image_url": "https://via.placeholder.com/1024"
-            }
-        else:
-            content = self.content_engine.generate_content(data)
-        
-        # 3. Store for Approval
-        content_id = f"day_{day}"
-        self._save_approval_state(content_id, content)
-
-        # 4. Send to Telegram for Approval
-        if self.mock:
-            print("MOCK MODE: Skipping Telegram send. Check approvals.json for results.")
-            print(f"Generated Content: {json.dumps(content, indent=2)}")
-        else:
-            print("Sending to Telegram for approval...")
-            await self.telegram_handler.send_for_approval(content_id, content)
-            print("Done! Waiting for approval via Telegram.")
+            # 2. Generate Content via Claude
+            print("Generating content...")
+            if self.mock:
+                content = {
+                    "linkedin": f"Mock LinkedIn Post for {data['title']}\n\nThis is a test post.",
+                    "instagram": f"Slide 1: Welcome to {data['title']}",
+                    "image_url": "https://via.placeholder.com/1024"
+                }
+            else:
+                content = await self.content_engine.generate_content(data)
+            
+            content_id = f"day_{day}"
+            self._save_approval_state(content_id, content)
+            
+            if self.mock:
+                print("MOCK MODE: Skipping Telegram send. Check approvals.json for results.")
+                print(f"Generated Content: {json.dumps(content, indent=2)}")
+            else:
+                print("Sending to Telegram for approval...")
+                await self.telegram_handler.send_for_approval(content_id, content)
+                print("Done! Waiting for approval via Telegram.")
+        except Exception as e:
+            print(f"Error in run_day_process for Day {day}: {e}")
 
     def run_approval_worker(self):
         """Starts the Telegram bot to handle 'Approve' callbacks."""
@@ -101,10 +101,29 @@ class ContentEngineAPP:
             try:
                 start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
                 current_day = (now.date() - start_date).days + 1
-                await update.message.reply_text(f"🚀 <b>Manual Trigger:</b> Generating content for Day {current_day}...", parse_mode='HTML')
-                await self.run_day_process(current_day)
+                status_msg = await update.message.reply_text(f"🚀 <b>Manual Trigger:</b> Starting Day {current_day}...", parse_mode='HTML')
+                
+                # 1. Fetch from sheet
+                await status_msg.edit_text(f"🚀 <b>Day {current_day}:</b> Reading from Google Sheets... 📊", parse_mode='HTML')
+                data = self.gs_handler.get_topic_by_day(current_day)
+                if not data:
+                    await status_msg.edit_text(f"❌ <b>Error:</b> Could not find data for day {current_day} in Sheet.", parse_mode='HTML')
+                    return
+
+                # 2. Generate Content
+                await status_msg.edit_text(f"🚀 <b>Day {current_day}:</b> AI is writing your post... 📝", parse_mode='HTML')
+                content = await self.content_engine.generate_content(data)
+                
+                # 3. Handle result
+                content_id = f"day_{current_day}"
+                self._save_approval_state(content_id, content)
+                
+                await status_msg.edit_text(f"🚀 <b>Day {current_day}:</b> Sending for approval... 📲", parse_mode='HTML')
+                await self.telegram_handler.send_for_approval(content_id, content)
+                await status_msg.delete() # Clean up trigger message
+                
             except Exception as e:
-                await update.message.reply_text(f"❌ Error during trigger: {e}")
+                await update.message.reply_text(f"❌ <b>Error during trigger:</b> {e}", parse_mode='HTML')
 
         async def custom_handle_callback(update, context):
             query = update.callback_query
@@ -152,6 +171,8 @@ class ContentEngineAPP:
                     
                     # Post to Buffer
                     image_url = content_data.get("image_url")
+                    
+                    # These are still sync but usually much faster than AI generation
                     li_res = self.buffer_poster.post_to_linkedin(content_data["linkedin"], image_url=image_url, scheduled_at=li_time) or {}
                     
                     ig_res = {}
