@@ -66,7 +66,7 @@ class ContentEngineAPP:
                 content = {
                     "linkedin": f"Mock LinkedIn Post for {data['title']}\n\nThis is a test post.",
                     "instagram": f"Slide 1: Welcome to {data['title']}",
-                    "image_url": "https://via.placeholder.com/1024"
+                    "image_url": "https://placehold.co/1024x1024.png"
                 }
             else:
                 content = await self.content_engine.generate_content(data)
@@ -190,7 +190,8 @@ class ContentEngineAPP:
                     )
                     
                     if not li_success:
-                        status_msg += f"\n❌ LinkedIn Error: {li_data.get('message', 'Buffer connection issue')}"
+                        error_code = li_data.get('code', 'N/A')
+                        status_msg += f"\n❌ LinkedIn Error: {li_data.get('message', 'Buffer connection issue')} (Code: {error_code})"
 
                     await query.edit_message_text(text=status_msg, parse_mode='HTML')
                     
