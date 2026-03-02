@@ -1,0 +1,7 @@
+anthropic
+openai
+requests
+python-dotenv
+python-telegram-bot
+flask
+gunicorn
