@@ -78,21 +78,28 @@ class GoogleSheetsHandler:
                 return None
             
             # Columns: Day, Title, Hook, Category, Footer, Status...
+            print(f"--- DEBUG: Searching for Day '{day}' in {len(values)-1} rows... ---")
             for row in values[1:]:
-                if len(row) >= 1 and str(row[0]) == str(day):
-                    # Fill missing columns with empty strings
-                    while len(row) < 5:
-                        row.append("")
+                if len(row) >= 1:
+                    # Clean the value: remove whitespace and potential .0 from numbers
+                    clean_val = str(row[0]).strip().split('.')[0]
+                    if clean_val == str(day):
+                        print(f"--- DEBUG: Found Day {day}! ---")
+                        # Fill missing columns with empty strings
+                        while len(row) < 5:
+                            row.append("")
                         
-                    return {
-                        "day": row[0],
-                        "title": row[1],
-                        "hook": row[2],
-                        "category": row[3],
-                        "footer": row[4]
-                    }
-                    
-            print(f"Day {day} not found in sheet.")
+                        return {
+                            "day": row[0],
+                            "title": row[1],
+                            "hook": row[2],
+                            "category": row[3],
+                            "footer": row[4]
+                        }
+            
+            # If not found, show the first few values to help debug
+            sample_vals = [str(r[0]) for r in values[1:6] if len(r) > 0]
+            print(f"--- DEBUG: Day {day} not found. First few values in Column A: {sample_vals}")
             return None
 
         except HttpError as err:
