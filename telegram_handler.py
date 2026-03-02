@@ -10,7 +10,21 @@ class TelegramHandler:
     def __init__(self):
         self.token = os.getenv("TELEGRAM_BOT_TOKEN")
         self.chat_id = os.getenv("TELEGRAM_CHAT_ID")
-        self.app = ApplicationBuilder().token(self.token).build()
+        # Increasing timeouts for better cloud stability
+        self.app = (
+            ApplicationBuilder()
+            .token(self.token)
+            .read_timeout(30)
+            .connect_timeout(30)
+            .build()
+        )
+
+    async def ping_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text("🏓 <b>Pong!</b> I am alive and listening.", parse_mode='HTML')
+
+    async def trigger_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        # We'll override this in main.py to trigger content generation
+        pass
 
     async def send_for_approval(self, content_id, content_data):
         """Sends content to Telegram with Approve/Reject buttons."""
@@ -66,9 +80,16 @@ class TelegramHandler:
         # We'll override this in main.py to handle the actual approval logic
         pass
 
-    def run(self, callback_handler=None):
-        """Starts the bot to listen for callbacks."""
+    def run(self, callback_handler=None, trigger_handler=None):
+        """Starts the bot to listen for callbacks and commands."""
         self.app.add_handler(CommandHandler("start", self.start_command))
+        self.app.add_handler(CommandHandler("ping", self.ping_command))
+        
+        if trigger_handler:
+            self.app.add_handler(CommandHandler("trigger", trigger_handler))
+        else:
+            self.app.add_handler(CommandHandler("trigger", self.trigger_command))
+
         if callback_handler:
             self.app.add_handler(CallbackQueryHandler(callback_handler))
         else:

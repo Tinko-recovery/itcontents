@@ -90,6 +90,22 @@ class ContentEngineAPP:
             print("MOCK MODE: Approval worker cannot run without a real Telegram Bot Token.")
             return
 
+        async def custom_handle_trigger(update, context):
+            """Manual trigger via /trigger command."""
+            from datetime import timedelta, timezone
+            ist = timezone(timedelta(hours=5, minutes=30))
+            now = datetime.now(ist)
+            
+            # Calculate current day
+            start_date_str = os.getenv("START_DATE", now.strftime("%Y-%m-%d"))
+            try:
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                current_day = (now.date() - start_date).days + 1
+                await update.message.reply_text(f"🚀 <b>Manual Trigger:</b> Generating content for Day {current_day}...", parse_mode='HTML')
+                await self.run_day_process(current_day)
+            except Exception as e:
+                await update.message.reply_text(f"❌ Error during trigger: {e}")
+
         async def custom_handle_callback(update, context):
             query = update.callback_query
             print(f"--- DEBUG: Callback received! Data: {query.data} ---")
@@ -109,7 +125,7 @@ class ContentEngineAPP:
                         print("--- DEBUG: approvals.json missing ---")
                         await query.edit_message_text(
                             text="⚠️ <b>State Lost:</b> The bot was recently updated or restarted. "
-                                 "Please re-generate the content to approve it.", 
+                                 "Please use /trigger to start over.", 
                             parse_mode='HTML'
                         )
                         return
@@ -120,7 +136,7 @@ class ContentEngineAPP:
                     if content_id not in data:
                         await query.edit_message_text(
                             text=f"❌ <b>ID Not Found:</b> {content_id} is missing from my memory. "
-                                 "Please try generating again.",
+                                 "Please use /trigger to try again.",
                             parse_mode='HTML'
                         )
                         return
@@ -179,7 +195,10 @@ class ContentEngineAPP:
         threading.Thread(target=run_scheduler, daemon=True).start()
 
         print("\n🚀 Approval Worker & Scheduler is starting...")
-        self.telegram_handler.run(callback_handler=custom_handle_callback)
+        self.telegram_handler.run(
+            callback_handler=custom_handle_callback, 
+            trigger_handler=custom_handle_trigger
+        )
 
     async def daily_scheduler(self):
         """Checks every minute if it's time to generate new content (Configurable)."""
