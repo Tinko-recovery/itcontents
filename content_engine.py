@@ -15,21 +15,29 @@ class ContentEngine:
             "You focus on ROI, productivity, and future-proofing businesses."
         )
 
-    def generate_content(self, topic):
+    def generate_content(self, data):
+        """Generates content using Title, Hook, and Category from the sheet."""
+        title = data.get("title", "AI Innovation")
+        hook = data.get("hook", "")
+        category = data.get("category", "General")
+        footer = data.get("footer", "made by itappens.ai ( automations by Sadish)")
+        
         prompt = (
             f"{self.persona}\n\n"
-            f"Topic: {topic}\n\n"
+            f"Context: We are in a 30-day series about {category}.\n"
+            f"Main Topic/Title: {title}\n"
+            f"Suggested Hook: {hook}\n\n"
             "Generate three things:\n"
-            "1. A LinkedIn post: Engaging hook, value-driven body with bullet points, and a call to action. Keep it UNDER 1000 characters (STRICT LIMIT).\n"
+            "1. A LinkedIn post: Use the suggested hook if it's strong. Value-driven body with bullet points, and a call to action. Keep it UNDER 1000 characters.\n"
             "2. An Instagram Carousel script: 5-7 slides. Each slide should have a clear heading and short text.\n"
-            "3. A DALL-E Image Prompt: A highly descriptive, professional prompt for an image representing this topic. Focus on high-quality 3D renders, clean business aesthetics, or evocative conceptual art. Avoid text in the image.\n\n"
+            "3. A DALL-E Image Prompt: A highly descriptive, professional prompt representing this topic (business AI aesthetic, no text).\n\n"
             "Format the output as follows:\n"
             "---LINKEDIN---\n"
             "[LinkedIn Content]\n"
-            "made by itappens.ai ( automations by Sadish)\n"
+            f"{footer}\n"
             "---INSTAGRAM---\n"
             "[Instagram Content]\n"
-            "made by itappens.ai ( automations by Sadish)\n"
+            f"{footer}\n"
             "---IMAGE_PROMPT---\n"
             "[Image Prompt Text]"
         )

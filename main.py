@@ -45,25 +45,31 @@ class ContentEngineAPP:
         
         # 1. Read Topic from Google Sheet
         if self.mock:
-            topic = f"Mock Real Estate Topic for Day {day}"
+            data = {
+                "title": f"Mock Title for Day {day}",
+                "hook": "This is a mock hook.",
+                "category": "Mock Testing",
+                "footer": "Mock Footer"
+            }
         else:
-            topic = self.gs_handler.get_topic_by_day(day)
+            data = self.gs_handler.get_topic_by_day(day)
             
-        if not topic:
-            print(f"Error: Could not find topic for day {day}")
+        if not data:
+            print(f"Error: Could not find data for day {day}")
             return
 
-        print(f"Topic found: {topic}")
+        print(f"Topic found: {data['title']}")
 
         # 2. Generate Content via Claude
         print("Generating content...")
         if self.mock:
             content = {
-                "linkedin": f"Mock LinkedIn Post for {topic}\n\nThis is a test post created during mock mode.",
-                "instagram": f"Slide 1: Welcome to {topic}\nSlide 2: Benefits of AI in Real Estate\nSlide 3: Call to action."
+                "linkedin": f"Mock LinkedIn Post for {data['title']}\n\nThis is a test post.",
+                "instagram": f"Slide 1: Welcome to {data['title']}",
+                "image_url": "https://via.placeholder.com/1024"
             }
         else:
-            content = self.content_engine.generate_content(topic)
+            content = self.content_engine.generate_content(data)
         
         # 3. Store for Approval
         content_id = f"day_{day}"

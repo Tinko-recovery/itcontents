@@ -63,7 +63,7 @@ class GoogleSheetsHandler:
         return creds
 
     def get_topic_by_day(self, day):
-        """Fetches the topic for a specific day from the sheet."""
+        """Fetches all data for a specific day from the sheet."""
         if not self.creds:
             return None
             
@@ -77,11 +77,20 @@ class GoogleSheetsHandler:
                 print('No data found.')
                 return None
             
-            # Assuming Day is in Column A (index 0) and Topic in Column B (index 1)
-            # And row 0 is header
+            # Columns: Day, Title, Hook, Category, Footer, Status...
             for row in values[1:]:
-                if len(row) >= 2 and str(row[0]) == str(day):
-                    return row[1]
+                if len(row) >= 1 and str(row[0]) == str(day):
+                    # Fill missing columns with empty strings
+                    while len(row) < 5:
+                        row.append("")
+                        
+                    return {
+                        "day": row[0],
+                        "title": row[1],
+                        "hook": row[2],
+                        "category": row[3],
+                        "footer": row[4]
+                    }
                     
             print(f"Day {day} not found in sheet.")
             return None
