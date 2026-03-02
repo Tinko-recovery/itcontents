@@ -94,5 +94,10 @@ class ContentEngine:
 if __name__ == "__main__":
     # Test generation
     engine = ContentEngine()
-    test_topic = "How AI is revolutionizing Supply Chain Management in 2024"
-    print(engine.generate_content(test_topic))
+    test_data = {
+        "title": "The 8 Pages That Changed AI",
+        "hook": "8 pages. That's all it took to flip the industry.",
+        "category": "Untold Origin Story",
+        "footer": "made by itappens.ai ( automations by Sadish)"
+    }
+    print(engine.generate_content(test_data))
