@@ -9,7 +9,8 @@ class ContentEngine:
     def __init__(self):
         self.ant_client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         self.oa_client = openai.AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        self.model = "claude-3-5-sonnet-20241022" # Using a more robust model name
+        # Fallback to a verified Claude 4 model available in this environment
+        self.model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929")
         self.persona = (
             "You are a High-Level Business AI Strategist. Your goal is to simplify complex AI concepts "
             "for entrepreneurs and business leaders. Your tone is professional, authoritative, but accessible. "
