@@ -79,27 +79,34 @@ class GoogleSheetsHandler:
             
             # Columns: Day, Title, Hook, Category, Footer, Status...
             print(f"--- DEBUG: Searching for Day '{day}' in {len(values)-1} rows... ---")
-            for row in values[1:]:
-                if len(row) >= 1:
-                    # Clean the value: remove whitespace and potential .0 from numbers
-                    clean_val = str(row[0]).strip().split('.')[0]
-                    if clean_val == str(day):
-                        print(f"--- DEBUG: Found Day {day}! ---")
-                        # Fill missing columns with empty strings
-                        while len(row) < 5:
-                            row.append("")
-                        
-                        return {
-                            "day": row[0],
-                            "title": row[1],
-                            "hook": row[2],
-                            "category": row[3],
-                            "footer": row[4]
-                        }
+            for i, row in enumerate(values[1:]):
+                if not row or len(row) == 0:
+                    continue
+                
+                # Clean the value: remove whitespace, handle common prefixes
+                raw_val = str(row[0]).strip().lower()
+                
+                # Handle '1', '1.0', 'Day 1', 'day 1'
+                match_val = raw_val.replace("day", "").strip().split('.')[0]
+                
+                if i < 10:
+                    print(f"--- DEBUG: Row {i+1} Column A: '{raw_val}' -> Matched as: '{match_val}'")
+
+                if match_val == str(day):
+                    print(f"--- DEBUG: SUCCESS! Found Day {day} at row {i+2} ---")
+                    # Fill missing columns with empty strings
+                    while len(row) < 5:
+                        row.append("")
+                    
+                    return {
+                        "day": row[0],
+                        "title": row[1],
+                        "hook": row[2],
+                        "category": row[3],
+                        "footer": row[4]
+                    }
             
-            # If not found, show the first few values to help debug
-            sample_vals = [str(r[0]) for r in values[1:6] if len(r) > 0]
-            print(f"--- DEBUG: Day {day} not found. First few values in Column A: {sample_vals}")
+            print(f"--- DEBUG: Day {day} not found in the first {len(values)} rows.")
             return None
 
         except HttpError as err:
