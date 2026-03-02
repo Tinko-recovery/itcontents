@@ -1,3 +1,4 @@
+import os
 import anthropic
 import openai
 from dotenv import load_dotenv
@@ -20,8 +21,18 @@ class ContentEngine:
         title = data.get("title", "AI Innovation")
         hook = data.get("hook", "")
         category = data.get("category", "General")
-        footer = data.get("footer", "made by itappens.ai ( automations by Sadish)")
         
+        # New multi-line footer provided by user
+        footer = (
+            "\n\nMeta note: This post was autonomously created by an AI agent I built @ itappens.ai — testing what's possible. — Sadish Sugumaran\n\n"
+            "Disclaimer: Content is AI-generated and fact-checked by me. This is an independent personal experiment."
+        )
+        
+        # Also include any specific "series" footer from the sheet if present
+        sheet_footer = data.get("footer", "")
+        if sheet_footer:
+            footer = f"\n\n{sheet_footer}\n" + footer
+
         prompt = (
             f"{self.persona}\n\n"
             f"Context: We are in a 30-day series about {category}.\n"
@@ -31,7 +42,7 @@ class ContentEngine:
             "1. A LinkedIn post: Use the suggested hook if it's strong. Value-driven body with bullet points, and a call to action. Keep it UNDER 1000 characters.\n"
             "2. An Instagram Carousel script: 5-7 slides. Each slide should have a clear heading and short text.\n"
             "3. A DALL-E Image Prompt: A highly descriptive, professional prompt representing this topic (business AI aesthetic, no text).\n\n"
-            "Format the output as follows:\n"
+            "Format the output EXACTLY as follows (do not skip the footer sections):\n"
             "---LINKEDIN---\n"
             "[LinkedIn Content]\n"
             f"{footer}\n"
