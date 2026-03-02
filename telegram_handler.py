@@ -33,7 +33,7 @@ class TelegramHandler:
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        # 1. Send the photo first (no buttons here to avoid them getting pushed up)
+        # 1. Send the photo first
         if image_url:
             try:
                 await self.app.bot.send_photo(
@@ -56,28 +56,23 @@ class TelegramHandler:
             chat_id=self.chat_id, 
             text=full_text, 
             parse_mode='HTML',
-            reply_markup=reply_markup # Buttons go here!
+            reply_markup=reply_markup
         )
 
+    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text("🤖 <b>Zero-Touch Bot is ONLINE!</b>\n\nI am listening for approvals and running the daily scheduler. Every morning at your scheduled time, I will ping you here.", parse_mode='HTML')
+
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        query = update.callback_query
-        await query.answer()
-        
-        action, content_id = query.data.split("_")
-        
-        if action == "approve":
-            await query.edit_message_text(text=f"✅ Content {content_id} Approved! Sending to Buffer...")
-            # Here you would trigger the buffer posting logic
-        else:
-            await query.edit_message_text(text=f"❌ Content {content_id} Rejected.")
+        # We'll override this in main.py to handle the actual approval logic
+        pass
 
-    def run(self):
+    def run(self, callback_handler=None):
         """Starts the bot to listen for callbacks."""
-        self.app.add_handler(CallbackQueryHandler(self.handle_callback))
+        self.app.add_handler(CommandHandler("start", self.start_command))
+        if callback_handler:
+            self.app.add_handler(CallbackQueryHandler(callback_handler))
+        else:
+            self.app.add_handler(CallbackQueryHandler(self.handle_callback))
+        
+        print("\n🚀 Telegram Bot is starting...")
         self.app.run_polling()
-
-if __name__ == "__main__":
-    handler = TelegramHandler()
-    # To test sending (requires async loop)
-    # asyncio.run(handler.send_for_approval("day_1", {"linkedin": "Test LI", "instagram": "Test IG"}))
-    handler.run()

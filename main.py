@@ -90,8 +90,6 @@ class ContentEngineAPP:
             print("MOCK MODE: Approval worker cannot run without a real Telegram Bot Token.")
             return
 
-        from telegram.ext import CallbackQueryHandler
-
         async def custom_handle_callback(update, context):
             query = update.callback_query
             print(f"--- DEBUG: Callback received! Data: {query.data} ---")
@@ -101,79 +99,69 @@ class ContentEngineAPP:
                 
                 data_parts = query.data.split("_", 1)
                 if len(data_parts) < 2:
-                    print("--- DEBUG: Malformed callback data ---")
                     return
                 
                 action, content_id = data_parts[0], data_parts[1]
-                print(f"--- DEBUG: Action: {action}, ID: {content_id} ---")
                 
                 if action == "approve":
                     # Load content from store
-                    if os.path.exists(self.approval_store):
-                        with open(self.approval_store, "r") as f:
-                            data = json.load(f)
-                        
-                        if content_id in data:
-                            content_data = data[content_id]["content"]
-                            await query.edit_message_text(text=f"⏳ Processing approval for {content_id}...")
-                            print(f"--- DEBUG: Processing approval for {content_id} ---")
-                            
-                            # Calculate peak times
-                            import datetime as dt
-                            tomorrow_date = dt.date.today() + dt.timedelta(days=1)
-                            li_time = dt.datetime.combine(tomorrow_date, dt.time(9, 0)).isoformat() + "Z"
-                            ig_time = dt.datetime.combine(tomorrow_date, dt.time(11, 0)).isoformat() + "Z"
-                            
-                            # Post to Buffer
-                            print(f"--- DEBUG: Posting {content_id} to Buffer... ---")
-                            image_url = content_data.get("image_url")
-                            
-                            li_res = self.buffer_poster.post_to_linkedin(
-                                content_data["linkedin"], 
-                                image_url=image_url, 
-                                scheduled_at=li_time
-                            ) or {}
-                            
-                            ig_res = {}
-                            if self.buffer_poster.instagram_profile and "your_" not in self.buffer_poster.instagram_profile:
-                                ig_res = self.buffer_poster.post_to_instagram(
-                                    content_data["instagram"], 
-                                    image_url=image_url, 
-                                    scheduled_at=ig_time
-                                ) or {}
-                            
-                            # Extract error messages
-                            li_data = li_res.get("data", {}).get("createPost", {})
-                            li_success = "post" in li_data if li_data else False
-                            
-                            ig_data = ig_res.get("data", {}).get("createPost", {})
-                            ig_success = "post" in ig_data if ig_data else False
-                            
-                            status_msg = (
-                                f"✅ <b>Approved and Scheduled!</b>\n\n"
-                                f"📅 LinkedIn: Tomorrow 9 AM\n"
-                                f"📅 Instagram: Tomorrow 11 AM\n"
-                            )
-                            
-                            if not li_success:
-                                status_msg += f"\n❌ LinkedIn Error: {li_data.get('message', 'Unknown error')}"
-                            if not ig_success and "your_" not in (self.buffer_poster.instagram_profile or "your_"):
-                                status_msg += f"\n❌ Instagram Error: {ig_data.get('message', 'Unknown error')}"
+                    if not os.path.exists(self.approval_store):
+                        print("--- DEBUG: approvals.json missing ---")
+                        await query.edit_message_text(
+                            text="⚠️ <b>State Lost:</b> The bot was recently updated or restarted. "
+                                 "Please re-generate the content to approve it.", 
+                            parse_mode='HTML'
+                        )
+                        return
 
-                            await query.edit_message_text(text=status_msg, parse_mode='HTML')
-                            
-                            # Update status
-                            data[content_id]["status"] = "approved"
-                            with open(self.approval_store, "w") as f:
-                                json.dump(data, f)
-                        else:
-                            print(f"--- DEBUG: ID {content_id} not found in approvals.json ---")
-                            await query.edit_message_text(text=f"❌ Error: ID {content_id} not found. Try generating again.")
-                    else:
-                        print("--- DEBUG: approvals.json does not exist ---")
-                        await query.edit_message_text(text="❌ Error: Approval database is empty. Please restart the process.")
+                    with open(self.approval_store, "r") as f:
+                        data = json.load(f)
+                    
+                    if content_id not in data:
+                        await query.edit_message_text(
+                            text=f"❌ <b>ID Not Found:</b> {content_id} is missing from my memory. "
+                                 "Please try generating again.",
+                            parse_mode='HTML'
+                        )
+                        return
+
+                    content_data = data[content_id]["content"]
+                    await query.edit_message_text(text=f"⏳ <b>Processing approval for {content_id}...</b>", parse_mode='HTML')
+                    
+                    # Calculate peak times
+                    import datetime as dt
+                    tomorrow_date = dt.date.today() + dt.timedelta(days=1)
+                    li_time = dt.datetime.combine(tomorrow_date, dt.time(9, 0)).isoformat() + "Z"
+                    ig_time = dt.datetime.combine(tomorrow_date, dt.time(11, 0)).isoformat() + "Z"
+                    
+                    # Post to Buffer
+                    image_url = content_data.get("image_url")
+                    li_res = self.buffer_poster.post_to_linkedin(content_data["linkedin"], image_url=image_url, scheduled_at=li_time) or {}
+                    
+                    ig_res = {}
+                    if self.buffer_poster.instagram_profile and "your_" not in self.buffer_poster.instagram_profile:
+                        ig_res = self.buffer_poster.post_to_instagram(content_data["instagram"], image_url=image_url, scheduled_at=ig_time) or {}
+                    
+                    # Status logic
+                    li_data = li_res.get("data", {}).get("createPost", {})
+                    li_success = "post" in li_data if li_data else False
+                    
+                    status_msg = (
+                        f"✅ <b>Approved and Scheduled!</b>\n\n"
+                        f"📅 LinkedIn: Tomorrow 9 AM\n"
+                        f"📅 Instagram: Tomorrow 11 AM\n"
+                    )
+                    
+                    if not li_success:
+                        status_msg += f"\n❌ LinkedIn Error: {li_data.get('message', 'Buffer connection issue')}"
+
+                    await query.edit_message_text(text=status_msg, parse_mode='HTML')
+                    
+                    # Update status
+                    data[content_id]["status"] = "approved"
+                    with open(self.approval_store, "w") as f:
+                        json.dump(data, f)
                 else:
-                    print(f"--- DEBUG: Content {content_id} rejected ---")
                     await query.edit_message_text(text=f"❌ Content {content_id} Rejected.")
                     
             except Exception as e:
@@ -183,8 +171,6 @@ class ContentEngineAPP:
                 except:
                     pass
 
-        self.telegram_handler.app.add_handler(CallbackQueryHandler(custom_handle_callback))
-        
         # Start the background task for daily content generation
         import threading
         def run_scheduler():
@@ -192,10 +178,8 @@ class ContentEngineAPP:
             
         threading.Thread(target=run_scheduler, daemon=True).start()
 
-        print("\n🚀 Approval Worker & Scheduler is LIVE!")
-        print("I am now listening for approvals and will trigger new content every morning.")
-        print("Keep this terminal window OPEN. Press Ctrl+C to stop.")
-        self.telegram_handler.app.run_polling()
+        print("\n🚀 Approval Worker & Scheduler is starting...")
+        self.telegram_handler.run(callback_handler=custom_handle_callback)
 
     async def daily_scheduler(self):
         """Checks every minute if it's time to generate new content (Configurable)."""

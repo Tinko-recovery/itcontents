@@ -1,0 +1,8 @@
+approvals.json
+last_run.txt
+__pycache__/
+.env
+token.json
+credentials.json
+*.pyc
+.git/
