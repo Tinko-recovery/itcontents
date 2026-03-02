@@ -16,11 +16,14 @@ class TelegramHandler:
         """Sends content to Telegram with Approve/Reject buttons."""
         image_url = content_data.get("image_url")
         
+        # Telegram photo captions have a 1024 character limit.
+        # We'll make a shorter summary for the caption and send the full text separately if needed.
+        linkedin_preview = content_data['linkedin'][:400] + "..." if len(content_data['linkedin']) > 400 else content_data['linkedin']
+        
         caption = (
-            f"🚀 <b>New Content Ready: {content_id}</b>\n\n"
-            f"📝 <b>LinkedIn Draft:</b>\n{content_data['linkedin'][:500]}...\n\n"
-            f"📸 <b>Instagram Draft:</b>\n{content_data['instagram'][:300]}...\n\n"
-            f"🎨 <b>Image Prompt:</b>\n<i>{content_data.get('image_prompt', 'None')}</i>"
+            f"🎨 <b>NEW AI CONTENT: {content_id}</b>\n\n"
+            f"📝 <b>LinkedIn Draft:</b>\n{linkedin_preview}\n\n"
+            f"✨ <i>Image generated via DALL-E 3</i>"
         )
 
         keyboard = [
@@ -31,6 +34,7 @@ class TelegramHandler:
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
+        # 1. Try sending the photo with a SHORT caption and buttons
         if image_url:
             try:
                 await self.app.bot.send_photo(
@@ -40,13 +44,22 @@ class TelegramHandler:
                     parse_mode='HTML',
                     reply_markup=reply_markup
                 )
+                
+                # 2. Also send the FULL content as a separate text message for easy reading/editing
+                full_text = (
+                    f"📄 <b>Full Text for {content_id}:</b>\n\n"
+                    f"<b>LinkedIn:</b>\n{content_data['linkedin']}\n\n"
+                    f"<b>Instagram:</b>\n{content_data['instagram']}"
+                )
+                await self.app.bot.send_message(chat_id=self.chat_id, text=full_text, parse_mode='HTML')
                 return
             except Exception as e:
-                print(f"Failed to send photo: {e}. Falling back to text.")
+                print(f"Failed to send photo: {e}. Falling back to text-only.")
 
+        # Fallback if photo fails
         await self.app.bot.send_message(
             chat_id=self.chat_id,
-            text=caption,
+            text=f"⚠️ Photo failed, but here is the content:\n\n{content_data['linkedin'][:1000]}",
             parse_mode='HTML',
             reply_markup=reply_markup
         )
