@@ -84,6 +84,9 @@ class ContentEngine:
         return parsed
 
     def _parse_content(self, content):
+        # Handle Windows encoding issues by skipping raw print of emojis
+        print("--- DEBUG: Parsing content from Claude... ---")
+        
         parts = content.split("---INSTAGRAM---")
         li_section = parts[0].replace("---LINKEDIN---", "").strip()
         
@@ -95,7 +98,19 @@ class ContentEngine:
             ig_section = rest[0].strip()
             if len(rest) > 1:
                 img_prompt = rest[1].strip()
-
+            else:
+                # Fallback: some LLMs might use different headers if they ignore instructions
+                import re
+                match = re.search(r"(?:IMAGE_PROMPT|DALL-E Prompt|Image Prompt):?\s*(.*)", parts[1], re.IGNORECASE | re.DOTALL)
+                if match:
+                    img_prompt = match.group(1).strip()
+                else:
+                    print("--- DEBUG: WARNING! Could not find Image Prompt in response.")
+        
+        # Strip common LLM artifacts like code blocks
+        img_prompt = img_prompt.replace("```", "").replace("text", "").strip()
+        
+        print(f"--- DEBUG: PARSED IMAGE PROMPT LENGTH: {len(img_prompt)} chars")
         return {
             "linkedin": li_section,
             "instagram": ig_section,

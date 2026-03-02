@@ -196,17 +196,20 @@ class ContentEngineAPP:
         self.telegram_handler.app.run_polling()
 
     async def daily_scheduler(self):
-        """Checks every hour if it's time to generate new content (8 AM)."""
-        print("⏰ Scheduler started. Checking daily at 8:00 AM IST.")
+        """Checks every minute if it's time to generate new content (Configurable)."""
+        target_hour = int(os.getenv("SCHEDULE_HOUR", 8))
+        target_minute = int(os.getenv("SCHEDULE_MINUTE", 0))
+        
+        print(f"⏰ Scheduler started. Checking daily at {target_hour:02d}:{target_minute:02d} IST.")
+        
         while True:
             # Get current time in IST (UTC+5:30)
             from datetime import timedelta, timezone
             ist = timezone(timedelta(hours=5, minutes=30))
             now = datetime.now(ist)
             
-            # If it's precisely 8 AM hour and we haven't run today
-            # We check a local file 'last_run.txt' to avoid double-runs if worker restarts
-            if now.hour == 8:
+            # If it matches our target hour and minute
+            if now.hour == target_hour and now.minute == target_minute:
                 last_run_date = ""
                 if os.path.exists("last_run.txt"):
                     with open("last_run.txt", "r") as f:
@@ -230,8 +233,8 @@ class ContentEngineAPP:
                     except Exception as e:
                         print(f"Error in scheduler day calculation: {e}")
             
-            # Wait 1 hour before checking again
-            await asyncio.sleep(3600)
+            # Wait 60 seconds before checking again
+            await asyncio.sleep(60)
 
 def main():
     parser = argparse.ArgumentParser(description="Zero-Touch AI Content Engine")
