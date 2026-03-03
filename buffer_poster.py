@@ -96,6 +96,12 @@ class BufferPoster:
             "input": {
                 "channelId": self.instagram_profile,
                 "text": text,
+                "metadata": {
+                    "instagram": {
+                        "type": "post",
+                        "shouldShareToFeed": True
+                    }
+                },
                 "schedulingType": "automatic",
                 "mode": "customScheduled" if scheduled_at else "addToQueue"
             }
