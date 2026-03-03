@@ -131,6 +131,77 @@ class ContentEngine:
             print(f"Imgur re-upload failed: {e}")
             return None
 
+    async def generate_reel_slides(self, data):
+        """Generates 5 slide scripts + per-slide DALL-E prompts for an Instagram Reel."""
+        title = data.get("title", "AI Innovation")
+        hook = data.get("hook", "")
+        category = data.get("category", "General")
+
+        prompt = (
+            f"{self.persona}\n\n"
+            f"Context: 30-day series on {category}. Topic: {title}. Hook: {hook}\n\n"
+            "Create an Instagram Reel with exactly 5 slides. For each slide provide:\n"
+            "- HEADING: A short bold line (max 6 words)\n"
+            "- TEXT: One punchy sentence expanding on it (max 15 words)\n"
+            "- IMAGE_PROMPT: A DALL-E prompt for a matching visual background (no text in image, business/tech aesthetic)\n\n"
+            "Also provide a short REEL_CAPTION (1 punchy line + 5 hashtags) for the Instagram post description.\n\n"
+            "Format EXACTLY as:\n"
+            "---SLIDE_1---\n"
+            "HEADING: ...\n"
+            "TEXT: ...\n"
+            "IMAGE_PROMPT: ...\n"
+            "---SLIDE_2---\n"
+            "HEADING: ...\n"
+            "TEXT: ...\n"
+            "IMAGE_PROMPT: ...\n"
+            "---SLIDE_3---\n"
+            "HEADING: ...\n"
+            "TEXT: ...\n"
+            "IMAGE_PROMPT: ...\n"
+            "---SLIDE_4---\n"
+            "HEADING: ...\n"
+            "TEXT: ...\n"
+            "IMAGE_PROMPT: ...\n"
+            "---SLIDE_5---\n"
+            "HEADING: ...\n"
+            "TEXT: ...\n"
+            "IMAGE_PROMPT: ...\n"
+            "---REEL_CAPTION---\n"
+            "[Caption + hashtags]"
+        )
+
+        response = await self.ant_client.messages.create(
+            model=self.model,
+            max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        return self._parse_reel_slides(response.content[0].text)
+
+    def _parse_reel_slides(self, content):
+        """Parse Claude's reel slide output into structured data."""
+        import re
+        slides = []
+        for i in range(1, 6):
+            pattern = rf"---SLIDE_{i}---(.*?)(?=---SLIDE_{i+1}---|---REEL_CAPTION---|$)"
+            match = re.search(pattern, content, re.DOTALL)
+            if match:
+                block = match.group(1).strip()
+                heading = re.search(r"HEADING:\s*(.+)", block)
+                text = re.search(r"TEXT:\s*(.+)", block)
+                img_prompt = re.search(r"IMAGE_PROMPT:\s*(.+)", block, re.DOTALL)
+                slides.append({
+                    "heading": heading.group(1).strip() if heading else f"Slide {i}",
+                    "text": text.group(1).strip() if text else "",
+                    "image_prompt": img_prompt.group(1).strip()[:500] if img_prompt else ""
+                })
+
+        caption_match = re.search(r"---REEL_CAPTION---(.*?)$", content, re.DOTALL)
+        caption = caption_match.group(1).strip() if caption_match else ""
+
+        print(f"--- DEBUG: Parsed {len(slides)} reel slides ---")
+        return {"slides": slides, "caption": caption}
+
     def _parse_content(self, content):
         # Handle Windows encoding issues by skipping raw print of emojis
         print("--- DEBUG: Parsing content from Claude... ---")

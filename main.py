@@ -9,6 +9,7 @@ from google_sheets_handler import GoogleSheetsHandler
 from content_engine import ContentEngine
 from telegram_handler import TelegramHandler
 from buffer_poster import BufferPoster
+from reel_generator import ReelGenerator
 from keep_alive import keep_alive
 
 load_dotenv()
@@ -21,6 +22,7 @@ class ContentEngineAPP:
             self.content_engine = ContentEngine()
             self.telegram_handler = TelegramHandler()
             self.buffer_poster = BufferPoster()
+            self.reel_gen = ReelGenerator(self.content_engine.oa_client)
         self.approval_store = "approvals.json"
 
     def _save_approval_state(self, content_id, content_data):
@@ -110,11 +112,23 @@ class ContentEngineAPP:
                     await status_msg.edit_text(f"❌ <b>Error:</b> Could not find data for day {current_day} in Sheet.", parse_mode='HTML')
                     return
 
-                # 2. Generate Content
-                await status_msg.edit_text(f"🚀 <b>Day {current_day}:</b> AI is writing your post... 📝", parse_mode='HTML')
-                content = await self.content_engine.generate_content(data)
+                # 2. Generate Content + Reel slides in parallel
+                await status_msg.edit_text(f"🚀 <b>Day {current_day}:</b> AI is writing your post + reel... 📝", parse_mode='HTML')
+                content, reel_data = await asyncio.gather(
+                    self.content_engine.generate_content(data),
+                    self.content_engine.generate_reel_slides(data)
+                )
                 
-                # 3. Handle result
+                # 3. Generate reel video
+                await status_msg.edit_text(f"🎬 <b>Day {current_day}:</b> Generating reel video... (this takes ~30s)", parse_mode='HTML')
+                slide_prompts = [s["image_prompt"] for s in reel_data["slides"] if s.get("image_prompt")]
+                reel_video_url = await self.reel_gen.generate_reel(slide_prompts)
+                
+                # Store reel data alongside LinkedIn content
+                content["reel_video_url"] = reel_video_url
+                content["reel_caption"] = reel_data.get("caption", content.get("instagram", ""))
+
+                # 4. Handle result
                 content_id = f"day_{current_day}"
                 self._save_approval_state(content_id, content)
                 
@@ -171,14 +185,20 @@ class ContentEngineAPP:
                     
                     # Post to Buffer
                     image_url = content_data.get("image_url")
+                    reel_url = content_data.get("reel_video_url")
+                    reel_caption = content_data.get("reel_caption", content_data.get("instagram", ""))
                     
                     li_res = self.buffer_poster.post_to_linkedin(content_data["linkedin"], image_url=image_url, scheduled_at=li_time) or {}
                     
                     ig_res = {}
                     ig_skipped = False
                     if self.buffer_poster.instagram_profile and "your_" not in self.buffer_poster.instagram_profile:
-                        print(f"--- DEBUG: Posting to Instagram with profile: {self.buffer_poster.instagram_profile}")
-                        ig_res = self.buffer_poster.post_to_instagram(content_data["instagram"], image_url=image_url, scheduled_at=ig_time) or {}
+                        if reel_url:
+                            print(f"--- DEBUG: Posting Reel to Instagram, video: {reel_url[:60]}")
+                            ig_res = self.buffer_poster.post_reel_to_instagram(reel_caption, reel_url, scheduled_at=ig_time) or {}
+                        else:
+                            print("--- DEBUG: No reel video, falling back to static image post")
+                            ig_res = self.buffer_poster.post_to_instagram(content_data["instagram"], image_url=image_url, scheduled_at=ig_time) or {}
                         print(f"--- DEBUG: Instagram raw response: {ig_res}")
                     else:
                         ig_skipped = True

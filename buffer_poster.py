@@ -117,6 +117,51 @@ class BufferPoster:
             
         return self._post_graphql(mutation, variables)
 
+    def post_reel_to_instagram(self, caption, video_url, scheduled_at=None):
+        """Post a Reel (video) to Instagram via Buffer."""
+        if not self.instagram_profile:
+            return None
+
+        mutation = """
+        mutation CreatePost($input: CreatePostInput!) {
+          createPost(input: $input) {
+            ... on PostActionSuccess {
+              post { id }
+            }
+            ... on RestProxyError {
+              message
+              code
+            }
+            ... on UnexpectedError {
+              message
+            }
+          }
+        }
+        """
+
+        variables = {
+            "input": {
+                "channelId": self.instagram_profile,
+                "text": caption,
+                "metadata": {
+                    "instagram": {
+                        "type": "reel",
+                        "shouldShareToFeed": True
+                    }
+                },
+                "assets": {
+                    "videos": [{"url": video_url}]
+                },
+                "schedulingType": "automatic",
+                "mode": "customScheduled" if scheduled_at else "addToQueue"
+            }
+        }
+
+        if scheduled_at:
+            variables["input"]["dueAt"] = scheduled_at
+
+        return self._post_graphql(mutation, variables)
+
 if __name__ == "__main__":
     poster = BufferPoster()
     # To test:
