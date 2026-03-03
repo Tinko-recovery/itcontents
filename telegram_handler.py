@@ -1,7 +1,9 @@
 import os
 import asyncio
+import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.error import Conflict
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -80,6 +82,13 @@ class TelegramHandler:
         # We'll override this in main.py to handle the actual approval logic
         pass
 
+    async def _handle_conflict_error(self, update, context):
+        """Gracefully handle Telegram Conflict errors on redeploy."""
+        if isinstance(context.error, Conflict):
+            logging.warning("Telegram Conflict detected — another instance is running. Waiting for it to shut down...")
+        else:
+            logging.error(f"Unhandled error: {context.error}")
+
     def run(self, callback_handler=None, trigger_handler=None):
         """Starts the bot to listen for callbacks and commands."""
         self.app.add_handler(CommandHandler("start", self.start_command))
@@ -95,5 +104,9 @@ class TelegramHandler:
         else:
             self.app.add_handler(CallbackQueryHandler(self.handle_callback))
         
-        print("\n🚀 Telegram Bot is starting...")
-        self.app.run_polling()
+        # Register error handler to suppress conflict spam on redeploy
+        self.app.add_error_handler(self._handle_conflict_error)
+        
+        print("\nTelegram Bot is starting...")
+        # drop_pending_updates=True ensures we don't fight old instances on redeploy
+        self.app.run_polling(drop_pending_updates=True)

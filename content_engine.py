@@ -25,13 +25,12 @@ class ContentEngine:
         hook = data.get("hook", "")
         category = data.get("category", "General")
         
-        # New multi-line footer provided by user
+        # Footer appended AFTER generation so it doesn't count toward Claude's output
+        # LinkedIn hard limit is 1248 chars — footer is ~220 chars, so cap body at 1000
         footer = (
             "\n\nMeta note: This post was autonomously created by an AI agent I built @ itappens.ai — testing what's possible. — Sadish Sugumaran\n\n"
             "Disclaimer: Content is AI-generated and fact-checked by me. This is an independent personal experiment."
         )
-        
-        # Also include any specific "series" footer from the sheet if present
         sheet_footer = data.get("footer", "")
         if sheet_footer:
             footer = f"\n\n{sheet_footer}\n" + footer
@@ -42,18 +41,17 @@ class ContentEngine:
             f"Main Topic/Title: {title}\n"
             f"Suggested Hook: {hook}\n\n"
             "Generate three things:\n"
-            "1. A LinkedIn post: Use the suggested hook if it's strong. Value-driven body with bullet points, and a call to action. Keep it UNDER 1000 characters.\n"
+            "1. A LinkedIn post: Use the suggested hook if it's strong. Value-driven body with bullet points, and a call to action. "
+            "CRITICAL: Keep it STRICTLY UNDER 950 characters (NOT including any footer). Short, punchy, high value.\n"
             "2. An Instagram caption for a single image post: Hook in the first line (make it punchy — stops the scroll). "
             "Then 4-6 short value bullets with emojis. End with a CTA and 5-8 relevant hashtags. "
             "Keep the total caption under 2200 characters. Optimised for saves and shares.\n"
             "3. A DALL-E Image Prompt: A highly descriptive, professional prompt representing this topic (business AI aesthetic, no text in image).\n\n"
-            "Format the output EXACTLY as follows (do not skip the footer sections):\n"
+            "Format the output EXACTLY as follows:\n"
             "---LINKEDIN---\n"
             "[LinkedIn Content]\n"
-            f"{footer}\n"
             "---INSTAGRAM---\n"
             "[Instagram Content]\n"
-            f"{footer}\n"
             "---IMAGE_PROMPT---\n"
             "[Image Prompt Text]"
         )
@@ -68,8 +66,16 @@ class ContentEngine:
         
         content_text = response.content[0].text
         parsed = self._parse_content(content_text)
-        
-        # Now generate the image using DALL-E
+
+        # Append footer AFTER parsing — enforcing hard char limits
+        LI_BODY_LIMIT = 1000  # leaves ~248 chars for footer within LinkedIn's 1248 cap
+        li_body = parsed.get("linkedin", "")[:LI_BODY_LIMIT]
+        parsed["linkedin"] = li_body + footer
+
+        # Instagram: just append footer (2200 cap is generous)
+        ig_body = parsed.get("instagram", "")
+        parsed["instagram"] = ig_body + footer
+
         if parsed.get("image_prompt"):
             print(f"Generating image with prompt: {parsed['image_prompt']}")
             try:
