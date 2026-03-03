@@ -191,6 +191,14 @@ class ContentEngineAPP:
                     ig_data = ig_res.get("data", {}).get("createPost", {})
                     ig_success = "post" in ig_data if ig_data else False
                     
+                    # Extract actual error message (GraphQL errors come in two formats)
+                    def get_error_msg(res, nested_data):
+                        # Format 1: top-level {"errors": [{"message": "..."}]}
+                        if res.get("errors"):
+                            return res["errors"][0].get("message", "Unknown error")
+                        # Format 2: nested {"data": {"createPost": {"message": "..."}}}
+                        return nested_data.get("message", "Buffer connection issue")
+                    
                     status_msg = (
                         f"✅ <b>Approved and Scheduled!</b>\n\n"
                         f"📅 LinkedIn: {'Tomorrow 9 AM ✅' if li_success else 'FAILED ❌'}\n"
@@ -198,12 +206,10 @@ class ContentEngineAPP:
                     )
                     
                     if not li_success:
-                        error_code = li_data.get('code', 'N/A')
-                        status_msg += f"\n❌ LinkedIn Error: {li_data.get('message', 'Buffer connection issue')} (Code: {error_code})"
+                        status_msg += f"\n❌ LinkedIn Error: {get_error_msg(li_res, li_data)}"
 
                     if not ig_success and not ig_skipped:
-                        ig_error_code = ig_data.get('code', 'N/A')
-                        status_msg += f"\n❌ Instagram Error: {ig_data.get('message', 'Buffer connection issue')} (Code: {ig_error_code})"
+                        status_msg += f"\n❌ Instagram Error: {get_error_msg(ig_res, ig_data)}"
 
                     await query.edit_message_text(text=status_msg, parse_mode='HTML')
                     
