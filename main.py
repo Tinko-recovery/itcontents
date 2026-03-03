@@ -100,74 +100,98 @@ class ContentEngineAPP:
             print("MOCK MODE: Approval worker cannot run without a real Telegram Bot Token.")
             return
 
+        # Tracks background reel generation tasks: content_id -> asyncio.Task
+        pending_reel_tasks = {}
+
         async def custom_handle_trigger(update, context):
             """Manual trigger via /trigger command."""
             from datetime import timedelta, timezone
             ist = timezone(timedelta(hours=5, minutes=30))
             now = datetime.now(ist)
-            
-            # Calculate current day
+
             start_date_str = os.getenv("START_DATE", now.strftime("%Y-%m-%d"))
             try:
                 start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
                 current_day = (now.date() - start_date).days + 1
-                status_msg = await update.message.reply_text(f"🚀 <b>Manual Trigger:</b> Starting Day {current_day}...", parse_mode='HTML')
-                
-                # 1. Fetch topic — trending auto-pick OR Google Sheet
+                status_msg = await update.message.reply_text(
+                    f"\ud83d\ude80 <b>Manual Trigger:</b> Starting Day {current_day}...", parse_mode='HTML'
+                )
+
+                # 1. Fetch today's topic
                 if self.content_mode == "trending":
-                    await status_msg.edit_text(f"🔥 <b>Day {current_day}:</b> Hunting today's hottest AI story... 🌐", parse_mode='HTML')
+                    await status_msg.edit_text(
+                        f"\ud83d\udd25 <b>Day {current_day}:</b> Hunting today's hottest AI story... \ud83c\udf10",
+                        parse_mode='HTML'
+                    )
                     data = await self.trend_fetcher.get_trending_topic()
                     if not data:
-                        await status_msg.edit_text("⚠️ Trend fetch failed. Falling back to Google Sheets...", parse_mode='HTML')
+                        await status_msg.edit_text("\u26a0\ufe0f Trend fetch failed. Using Google Sheets...", parse_mode='HTML')
                         data = self.gs_handler.get_topic_by_day(current_day)
                 else:
-                    await status_msg.edit_text(f"🚀 <b>Day {current_day}:</b> Reading from Google Sheets... 📊", parse_mode='HTML')
+                    await status_msg.edit_text(
+                        f"\ud83d\ude80 <b>Day {current_day}:</b> Reading from Google Sheets... \ud83d\udcca",
+                        parse_mode='HTML'
+                    )
                     data = self.gs_handler.get_topic_by_day(current_day)
 
                 if not data:
-                    await status_msg.edit_text(f"❌ <b>Error:</b> Could not find topic for day {current_day}.", parse_mode='HTML')
+                    await status_msg.edit_text(
+                        f"\u274c <b>Error:</b> No topic found for day {current_day}.", parse_mode='HTML'
+                    )
                     return
 
-                # 2. Generate Content + Reel slides in parallel
-                await status_msg.edit_text(f"🚀 <b>Day {current_day}:</b> AI is writing your post + reel... 📝", parse_mode='HTML')
+                # 2. Generate LinkedIn content + reel slide scripts (in parallel)
+                await status_msg.edit_text(
+                    f"\u270d\ufe0f <b>Day {current_day}:</b> AI is writing content... \ud83d\udcdd",
+                    parse_mode='HTML'
+                )
                 content, reel_data = await asyncio.gather(
                     self.content_engine.generate_content(data),
                     self.content_engine.generate_reel_slides(data)
                 )
-                
-                # 3. Generate reel video
-                await status_msg.edit_text(f"🎬 <b>Day {current_day}:</b> Generating reel video... (this takes ~60s)", parse_mode='HTML')
-                slide_prompts = [s["image_prompt"] for s in reel_data.get("slides", []) if s.get("image_prompt")]
-                print(f"--- DEBUG REEL: reel_data slides count: {len(reel_data.get('slides', []))}")
-                print(f"--- DEBUG REEL: slide_prompts count: {len(slide_prompts)}")
-                print(f"--- DEBUG REEL: reel_data sample: {str(reel_data)[:300]}")
-                
-                reel_video_url = None
-                if slide_prompts:
-                    try:
-                        import traceback
-                        reel_video_url = await self.reel_gen.generate_reel(slide_prompts)
-                        print(f"--- DEBUG REEL: reel_video_url = {reel_video_url}")
-                    except Exception as reel_err:
-                        print(f"--- DEBUG REEL: EXCEPTION during reel generation: {reel_err}")
-                        print(traceback.format_exc())
-                else:
-                    print("--- DEBUG REEL: No slide prompts — skipping reel generation")
-                
-                # Store reel data alongside LinkedIn content
-                content["reel_video_url"] = reel_video_url
-                content["reel_caption"] = reel_data.get("caption", content.get("instagram", ""))
 
-                # 4. Handle result
+                # 3. Save content and send for Telegram approval IMMEDIATELY
                 content_id = f"day_{current_day}"
+                content["reel_video_url"] = None  # filled later by background task
+                content["reel_caption"] = reel_data.get("caption", content.get("instagram", ""))
                 self._save_approval_state(content_id, content)
-                
-                await status_msg.edit_text(f"🚀 <b>Day {current_day}:</b> Sending for approval... 📲", parse_mode='HTML')
+
+                # 4. Start reel generation in background (non-blocking)
+                slide_prompts = [
+                    s["image_prompt"] for s in reel_data.get("slides", []) if s.get("image_prompt")
+                ]
+                print(f"--- REEL: {len(slide_prompts)} slide prompts queued for background generation")
+
+                approval_store = self.approval_store
+
+                async def _bg_reel():
+                    try:
+                        url = await self.reel_gen.generate_reel(slide_prompts)
+                        print(f"--- REEL: Background done \u2192 {url}")
+                        if url and os.path.exists(approval_store):
+                            with open(approval_store, "r") as f:
+                                stored = json.load(f)
+                            if content_id in stored:
+                                stored[content_id]["content"]["reel_video_url"] = url
+                                with open(approval_store, "w") as f:
+                                    json.dump(stored, f)
+                    except Exception as bg_err:
+                        print(f"--- REEL: Background generation error: {bg_err}")
+
+                if slide_prompts:
+                    task = asyncio.create_task(_bg_reel())
+                    pending_reel_tasks[content_id] = task
+
+                # 5. Send approval preview immediately
+                await status_msg.edit_text(
+                    f"\ud83d\udcf2 <b>Day {current_day}:</b> Sending for approval... (reel generating in background \ud83c\udfa5)",
+                    parse_mode='HTML'
+                )
                 await self.telegram_handler.send_for_approval(content_id, content)
-                await status_msg.delete() # Clean up trigger message
-                
+                await status_msg.delete()
+
             except Exception as e:
-                await update.message.reply_text(f"❌ <b>Error during trigger:</b> {e}", parse_mode='HTML')
+                await update.message.reply_text(f"\u274c <b>Error during trigger:</b> {e}", parse_mode='HTML')
 
         async def custom_handle_callback(update, context):
             query = update.callback_query
@@ -213,11 +237,28 @@ class ContentEngineAPP:
                     li_time = dt.datetime.combine(tomorrow_date, dt.time(9, 0)).isoformat() + "Z"
                     ig_time = dt.datetime.combine(tomorrow_date, dt.time(11, 0)).isoformat() + "Z"
                     
-                    # Post to Buffer
+                    # Post to Buffer — wait up to 90s for background reel if still generating
                     image_url = content_data.get("image_url")
                     reel_url = content_data.get("reel_video_url")
                     reel_caption = content_data.get("reel_caption", content_data.get("instagram", ""))
-                    
+
+                    if not reel_url and content_id in pending_reel_tasks:
+                        task = pending_reel_tasks[content_id]
+                        if not task.done():
+                            await query.edit_message_text(
+                                text="\u23f3 <b>Waiting for reel to finish...</b> (up to 90s)", parse_mode='HTML'
+                            )
+                            try:
+                                await asyncio.wait_for(asyncio.shield(task), timeout=90)
+                            except asyncio.TimeoutError:
+                                print("--- REEL: Timed out waiting for background task")
+                        # Re-read from file in case background task updated it
+                        if os.path.exists(self.approval_store):
+                            with open(self.approval_store, "r") as f:
+                                fresh = json.load(f)
+                            reel_url = fresh.get(content_id, {}).get("content", {}).get("reel_video_url")
+                            print(f"--- REEL: After wait, reel_url = {reel_url}")
+
                     li_res = self.buffer_poster.post_to_linkedin(content_data["linkedin"], image_url=image_url, scheduled_at=li_time) or {}
                     
                     ig_res = {}
