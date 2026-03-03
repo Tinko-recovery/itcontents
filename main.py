@@ -136,9 +136,23 @@ class ContentEngineAPP:
                 )
                 
                 # 3. Generate reel video
-                await status_msg.edit_text(f"🎬 <b>Day {current_day}:</b> Generating reel video... (this takes ~30s)", parse_mode='HTML')
-                slide_prompts = [s["image_prompt"] for s in reel_data["slides"] if s.get("image_prompt")]
-                reel_video_url = await self.reel_gen.generate_reel(slide_prompts)
+                await status_msg.edit_text(f"🎬 <b>Day {current_day}:</b> Generating reel video... (this takes ~60s)", parse_mode='HTML')
+                slide_prompts = [s["image_prompt"] for s in reel_data.get("slides", []) if s.get("image_prompt")]
+                print(f"--- DEBUG REEL: reel_data slides count: {len(reel_data.get('slides', []))}")
+                print(f"--- DEBUG REEL: slide_prompts count: {len(slide_prompts)}")
+                print(f"--- DEBUG REEL: reel_data sample: {str(reel_data)[:300]}")
+                
+                reel_video_url = None
+                if slide_prompts:
+                    try:
+                        import traceback
+                        reel_video_url = await self.reel_gen.generate_reel(slide_prompts)
+                        print(f"--- DEBUG REEL: reel_video_url = {reel_video_url}")
+                    except Exception as reel_err:
+                        print(f"--- DEBUG REEL: EXCEPTION during reel generation: {reel_err}")
+                        print(traceback.format_exc())
+                else:
+                    print("--- DEBUG REEL: No slide prompts — skipping reel generation")
                 
                 # Store reel data alongside LinkedIn content
                 content["reel_video_url"] = reel_video_url
