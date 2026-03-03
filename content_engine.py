@@ -1,4 +1,6 @@
 import os
+import requests
+import base64
 import anthropic
 import openai
 from dotenv import load_dotenv
@@ -76,13 +78,50 @@ class ContentEngine:
                     quality="standard",
                     n=1
                 )
-                parsed["image_url"] = img_res.data[0].url
-                print("Image generated successfully!")
+                temp_url = img_res.data[0].url
+                print("Image generated successfully! Uploading to permanent host...")
+                
+                # Re-upload to Imgur for a permanent URL (DALL-E URLs expire in ~1 hour)
+                permanent_url = self._reupload_to_imgur(temp_url)
+                parsed["image_url"] = permanent_url or temp_url
+                
+                if permanent_url:
+                    print(f"Image permanently hosted at: {permanent_url}")
+                else:
+                    print("Warning: Imgur upload failed. Using temp DALL-E URL (may expire).")
             except Exception as e:
                 print(f"Failed to generate image: {e}")
                 parsed["image_url"] = None
         
         return parsed
+
+    def _reupload_to_imgur(self, image_url):
+        """Downloads an image from a URL and uploads it to Imgur anonymously."""
+        try:
+            # Download the image
+            img_data = requests.get(image_url, timeout=30)
+            img_data.raise_for_status()
+            
+            # Encode to base64
+            b64_image = base64.b64encode(img_data.content).decode("utf-8")
+            
+            # Upload to Imgur anonymously (Client-ID is the public API key)
+            imgur_client_id = os.getenv("IMGUR_CLIENT_ID", "546c25a59c58ad7")  # Public fallback
+            response = requests.post(
+                "https://api.imgur.com/3/image",
+                headers={"Authorization": f"Client-ID {imgur_client_id}"},
+                data={"image": b64_image, "type": "base64"},
+                timeout=30
+            )
+            result = response.json()
+            if result.get("success"):
+                return result["data"]["link"]
+            else:
+                print(f"Imgur upload error: {result}")
+                return None
+        except Exception as e:
+            print(f"Imgur re-upload failed: {e}")
+            return None
 
     def _parse_content(self, content):
         # Handle Windows encoding issues by skipping raw print of emojis
