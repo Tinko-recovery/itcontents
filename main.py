@@ -10,6 +10,7 @@ from content_engine import ContentEngine
 from telegram_handler import TelegramHandler
 from buffer_poster import BufferPoster
 from reel_generator import ReelGenerator
+from trend_fetcher import TrendFetcher
 from keep_alive import keep_alive
 
 load_dotenv()
@@ -23,7 +24,14 @@ class ContentEngineAPP:
             self.telegram_handler = TelegramHandler()
             self.buffer_poster = BufferPoster()
             self.reel_gen = ReelGenerator(self.content_engine.oa_client)
+            self.trend_fetcher = TrendFetcher(
+                ant_client=self.content_engine.ant_client,
+                model=self.content_engine.model
+            )
         self.approval_store = "approvals.json"
+        # CONTENT_MODE: 'trending' = auto-fetch hot topic | 'sheet' = use Google Sheets
+        self.content_mode = os.getenv("CONTENT_MODE", "trending").lower()
+        print(f"Content mode: {self.content_mode}")
 
     def _save_approval_state(self, content_id, content_data):
         """Saves generated content for later posting after approval."""
@@ -105,11 +113,19 @@ class ContentEngineAPP:
                 current_day = (now.date() - start_date).days + 1
                 status_msg = await update.message.reply_text(f"🚀 <b>Manual Trigger:</b> Starting Day {current_day}...", parse_mode='HTML')
                 
-                # 1. Fetch from sheet
-                await status_msg.edit_text(f"🚀 <b>Day {current_day}:</b> Reading from Google Sheets... 📊", parse_mode='HTML')
-                data = self.gs_handler.get_topic_by_day(current_day)
+                # 1. Fetch topic — trending auto-pick OR Google Sheet
+                if self.content_mode == "trending":
+                    await status_msg.edit_text(f"🔥 <b>Day {current_day}:</b> Hunting today's hottest AI story... 🌐", parse_mode='HTML')
+                    data = await self.trend_fetcher.get_trending_topic()
+                    if not data:
+                        await status_msg.edit_text("⚠️ Trend fetch failed. Falling back to Google Sheets...", parse_mode='HTML')
+                        data = self.gs_handler.get_topic_by_day(current_day)
+                else:
+                    await status_msg.edit_text(f"🚀 <b>Day {current_day}:</b> Reading from Google Sheets... 📊", parse_mode='HTML')
+                    data = self.gs_handler.get_topic_by_day(current_day)
+
                 if not data:
-                    await status_msg.edit_text(f"❌ <b>Error:</b> Could not find data for day {current_day} in Sheet.", parse_mode='HTML')
+                    await status_msg.edit_text(f"❌ <b>Error:</b> Could not find topic for day {current_day}.", parse_mode='HTML')
                     return
 
                 # 2. Generate Content + Reel slides in parallel
