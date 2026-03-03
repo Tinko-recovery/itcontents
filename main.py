@@ -172,26 +172,38 @@ class ContentEngineAPP:
                     # Post to Buffer
                     image_url = content_data.get("image_url")
                     
-                    # These are still sync but usually much faster than AI generation
                     li_res = self.buffer_poster.post_to_linkedin(content_data["linkedin"], image_url=image_url, scheduled_at=li_time) or {}
                     
                     ig_res = {}
+                    ig_skipped = False
                     if self.buffer_poster.instagram_profile and "your_" not in self.buffer_poster.instagram_profile:
+                        print(f"--- DEBUG: Posting to Instagram with profile: {self.buffer_poster.instagram_profile}")
                         ig_res = self.buffer_poster.post_to_instagram(content_data["instagram"], image_url=image_url, scheduled_at=ig_time) or {}
+                        print(f"--- DEBUG: Instagram raw response: {ig_res}")
+                    else:
+                        ig_skipped = True
+                        print(f"--- DEBUG: Instagram SKIPPED. Profile value: '{self.buffer_poster.instagram_profile}'")
                     
                     # Status logic
                     li_data = li_res.get("data", {}).get("createPost", {})
                     li_success = "post" in li_data if li_data else False
                     
+                    ig_data = ig_res.get("data", {}).get("createPost", {})
+                    ig_success = "post" in ig_data if ig_data else False
+                    
                     status_msg = (
                         f"✅ <b>Approved and Scheduled!</b>\n\n"
-                        f"📅 LinkedIn: Tomorrow 9 AM\n"
-                        f"📅 Instagram: Tomorrow 11 AM\n"
+                        f"📅 LinkedIn: {'Tomorrow 9 AM ✅' if li_success else 'FAILED ❌'}\n"
+                        f"📅 Instagram: {'Tomorrow 11 AM ✅' if ig_success else ('Skipped (not configured)' if ig_skipped else 'FAILED ❌')}\n"
                     )
                     
                     if not li_success:
                         error_code = li_data.get('code', 'N/A')
                         status_msg += f"\n❌ LinkedIn Error: {li_data.get('message', 'Buffer connection issue')} (Code: {error_code})"
+
+                    if not ig_success and not ig_skipped:
+                        ig_error_code = ig_data.get('code', 'N/A')
+                        status_msg += f"\n❌ Instagram Error: {ig_data.get('message', 'Buffer connection issue')} (Code: {ig_error_code})"
 
                     await query.edit_message_text(text=status_msg, parse_mode='HTML')
                     
