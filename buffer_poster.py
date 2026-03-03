@@ -96,7 +96,6 @@ class BufferPoster:
             "input": {
                 "channelId": self.instagram_profile,
                 "text": text,
-                "mediaType": "post",
                 "schedulingType": "automatic",
                 "mode": "customScheduled" if scheduled_at else "addToQueue"
             }
