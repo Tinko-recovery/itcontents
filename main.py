@@ -114,35 +114,35 @@ class ContentEngineAPP:
                 start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
                 current_day = (now.date() - start_date).days + 1
                 status_msg = await update.message.reply_text(
-                    f"\ud83d\ude80 <b>Manual Trigger:</b> Starting Day {current_day}...", parse_mode='HTML'
+                    f"🚀 <b>Manual Trigger:</b> Starting Day {current_day}...", parse_mode='HTML'
                 )
 
                 # 1. Fetch today's topic
                 if self.content_mode == "trending":
                     await status_msg.edit_text(
-                        f"\ud83d\udd25 <b>Day {current_day}:</b> Hunting today's hottest AI story... \ud83c\udf10",
+                        f"🔥 <b>Day {current_day}:</b> Hunting today's hottest AI story... 🌐",
                         parse_mode='HTML'
                     )
                     data = await self.trend_fetcher.get_trending_topic()
                     if not data:
-                        await status_msg.edit_text("\u26a0\ufe0f Trend fetch failed. Using Google Sheets...", parse_mode='HTML')
+                        await status_msg.edit_text("⚠️ Trend fetch failed. Using Google Sheets...", parse_mode='HTML')
                         data = self.gs_handler.get_topic_by_day(current_day)
                 else:
                     await status_msg.edit_text(
-                        f"\ud83d\ude80 <b>Day {current_day}:</b> Reading from Google Sheets... \ud83d\udcca",
+                        f"🚀 <b>Day {current_day}:</b> Reading from Google Sheets... 📊",
                         parse_mode='HTML'
                     )
                     data = self.gs_handler.get_topic_by_day(current_day)
 
                 if not data:
                     await status_msg.edit_text(
-                        f"\u274c <b>Error:</b> No topic found for day {current_day}.", parse_mode='HTML'
+                        f"❌ <b>Error:</b> No topic found for day {current_day}.", parse_mode='HTML'
                     )
                     return
 
                 # 2. Generate LinkedIn content + reel slide scripts (in parallel)
                 await status_msg.edit_text(
-                    f"\u270d\ufe0f <b>Day {current_day}:</b> AI is writing content... \ud83d\udcdd",
+                    f"✍️ <b>Day {current_day}:</b> AI is writing content... 📝",
                     parse_mode='HTML'
                 )
                 content, reel_data = await asyncio.gather(
@@ -167,7 +167,7 @@ class ContentEngineAPP:
                 async def _bg_reel():
                     try:
                         url = await self.reel_gen.generate_reel(slide_prompts)
-                        print(f"--- REEL: Background done \u2192 {url}")
+                        print(f"--- REEL: Background done → {url}")
                         if url and os.path.exists(approval_store):
                             with open(approval_store, "r") as f:
                                 stored = json.load(f)
@@ -184,14 +184,14 @@ class ContentEngineAPP:
 
                 # 5. Send approval preview immediately
                 await status_msg.edit_text(
-                    f"\ud83d\udcf2 <b>Day {current_day}:</b> Sending for approval... (reel generating in background \ud83c\udfa5)",
+                    f"📲 <b>Day {current_day}:</b> Sending for approval... (reel generating in background 🎥)",
                     parse_mode='HTML'
                 )
                 await self.telegram_handler.send_for_approval(content_id, content)
                 await status_msg.delete()
 
             except Exception as e:
-                await update.message.reply_text(f"\u274c <b>Error during trigger:</b> {e}", parse_mode='HTML')
+                await update.message.reply_text(f"❌ <b>Error during trigger:</b> {e}", parse_mode='HTML')
 
         async def custom_handle_callback(update, context):
             query = update.callback_query
@@ -246,7 +246,7 @@ class ContentEngineAPP:
                         task = pending_reel_tasks[content_id]
                         if not task.done():
                             await query.edit_message_text(
-                                text="\u23f3 <b>Waiting for reel to finish...</b> (up to 90s)", parse_mode='HTML'
+                                text="⏳ <b>Waiting for reel to finish...</b> (up to 90s)", parse_mode='HTML'
                             )
                             try:
                                 await asyncio.wait_for(asyncio.shield(task), timeout=90)
