@@ -95,7 +95,7 @@ class GoogleSheetsHandler:
                 if match_val == str(day):
                     print(f"--- DEBUG: SUCCESS! Found Day {day} at row {i+2} ---")
                     # Fill missing columns with empty strings
-                    while len(row) < 5:
+                    while len(row) < 6:
                         row.append("")
                     
                     return {
@@ -103,7 +103,8 @@ class GoogleSheetsHandler:
                         "title": row[1],
                         "hook": row[2],
                         "category": row[3],
-                        "footer": row[4]
+                        "footer": row[4],
+                        "directive": row[5]
                     }
             
             print(f"--- DEBUG: Day {day} not found in the first {len(values)} rows.")
