@@ -23,15 +23,13 @@ class ReelGenerator:
 
     async def generate_and_save_slide_images(self, slide_prompts: list[str], tmp_dir: str) -> list[str]:
         """
-        Generate DALL-E images and save them DIRECTLY to local files.
-        Returns list of local file paths (no Imgur involved at this stage).
+        Generate DALL-E images and save them DIRECTLY to local files in parallel.
         """
-        print(f"Generating {len(slide_prompts)} slide images for reel...")
-        local_paths = []
-
-        for i, prompt in enumerate(slide_prompts):
+        print(f"Generating {len(slide_prompts)} slide images for reel in parallel...")
+        
+        async def _generate_one(prompt, i):
             try:
-                print(f"  Slide {i+1}/{len(slide_prompts)}: generating...")
+                print(f"  Slide {i+1}: starting...")
                 img_res = await self.oa_client.images.generate(
                     model="dall-e-3",
                     prompt=prompt,
@@ -41,21 +39,21 @@ class ReelGenerator:
                 )
                 dall_e_url = img_res.data[0].url
 
-                # Download directly to local file — don't go through Imgur
                 img_data = requests.get(dall_e_url, timeout=30)
                 img_data.raise_for_status()
                 local_path = os.path.join(tmp_dir, f"slide_{i}.jpg")
                 with open(local_path, "wb") as f:
                     f.write(img_data.content)
 
-                local_paths.append(local_path)
-                print(f"  Slide {i+1}: saved locally ({len(img_data.content)//1024}KB)")
-
+                print(f"  Slide {i+1}: saved locally")
+                return local_path
             except Exception as e:
-                print(f"  Slide {i+1} generation failed: {e}")
-                local_paths.append(None)
+                print(f"  Slide {i+1} failed: {e}")
+                return None
 
-        return local_paths
+        # Run all generations concurrently
+        tasks = [_generate_one(prompt, i) for i, prompt in enumerate(slide_prompts)]
+        return await asyncio.gather(*tasks)
 
     def upload_images_to_imgur(self, local_paths: list[str]) -> list[str]:
         """Upload local slide images to Imgur for permanent hosting. Returns URLs."""
@@ -99,48 +97,77 @@ class ReelGenerator:
         print("All music sources failed — video will be silent.")
         return None
 
-    def create_reel_video(self, local_paths: list[str], music_path: str | None, tmp_dir: str) -> str | None:
+    def create_reel_video(self, local_paths: list[str], slides: list[dict], music_path: str | None, tmp_dir: str) -> str | None:
         """
-        Combine local slide images into a 9:16 vertical video using FFmpeg.
-        Uses local file paths directly — no HTTP downloads required.
+        Combine local slide images into a 9:16 vertical video with Ken Burns effect and text overlays.
         """
-        valid_paths = [p for p in local_paths if p and os.path.exists(p)]
-        if not valid_paths:
+        valid_indices = [i for i, p in enumerate(local_paths) if p and os.path.exists(p)]
+        if not valid_indices:
             print("No valid local slide images to create reel.")
             return None
 
         output_path = os.path.join(tmp_dir, "reel_output.mp4")
-        slide_duration = 4
-        total_duration = len(valid_paths) * slide_duration
+        slide_duration = 5  # Slightly longer for reading text
+        total_duration = len(valid_indices) * slide_duration
 
         inputs = []
         filter_parts = []
+        
+        # We'll use a common Linux font path as default (Render/Docker)
+        # Fontconfig should also handle just "Sans" or "Arial" if installed.
+        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        if not os.path.exists(font_path):
+             font_path = "Sans" # Fallback to generic fontconfig name
 
-        for i, path in enumerate(valid_paths):
-            inputs += ["-loop", "1", "-t", str(slide_duration + 0.5), "-i", path]
+        for i in valid_indices:
+            path = local_paths[i]
+            # Use -loop 1 to make the image act like a video stream
+            inputs += ["-loop", "1", "-t", str(slide_duration), "-i", path]
 
-        for i in range(len(valid_paths)):
+        for i, idx in enumerate(valid_indices):
+            slide_data = slides[idx]
+            heading = slide_data.get("heading", "").upper()
+            body_text = slide_data.get("text", "")
+            
+            # Simple word wrap for body text (FFmpeg doesn't do this well)
+            words = body_text.split()
+            wrapped_body = ""
+            for w_i, word in enumerate(words):
+                wrapped_body += word + " "
+                if (w_i + 1) % 5 == 0: wrapped_body += "\n"
+            
+            # Escape text for FFmpeg
+            heading = heading.replace("'", "\\'").replace(":", "\\:")
+            wrapped_body = wrapped_body.replace("'", "\\'").replace(":", "\\:").strip()
+
+            # 1. Scaling and Ken Burns (Zoom)
+            # 2. Add Heading Overlay
+            # 3. Add Body Text Overlay
             filter_parts.append(
-                f"[{i}:v]scale=1080:1920:force_original_aspect_ratio=increase,"
-                f"crop=1080:1920,setsar=1,fps=25[v{i}]"
+                f"[{i}:v]scale=2160:3840,zoompan=z='min(zoom+0.001,1.2)':d={slide_duration * 25}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920,"
+                f"drawtext=text='{heading}':fontfile={font_path}:fontsize=70:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-100:shadowcolor=black@0.7:shadowx=4:shadowy=4:box=1:boxcolor=black@0.4:boxborderw=20,"
+                f"drawtext=text='{wrapped_body}':fontfile={font_path}:fontsize=45:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2+100:shadowcolor=black@0.7:shadowx=3:shadowy=3:box=1:boxcolor=black@0.3:boxborderw=15[v{i}]"
             )
 
-        if len(valid_paths) == 1:
+        if len(valid_indices) == 1:
             final_video = "[v0]"
         else:
-            filter_parts.append("[v0][v1]xfade=transition=fade:duration=0.5:offset=3.5[xf0]")
-            for i in range(2, len(valid_paths)):
+            # Transitions
+            filter_parts.append(f"[v0][v1]xfade=transition=fade:duration=0.5:offset={slide_duration - 0.5}[xf0]")
+            for i in range(2, len(valid_indices)):
                 offset = (i * slide_duration) - 0.5
                 filter_parts.append(
                     f"[xf{i-2}][v{i}]xfade=transition=fade:duration=0.5:offset={offset}[xf{i-1}]"
                 )
-            final_video = f"[xf{len(valid_paths)-2}]"
+            final_video = f"[xf{len(valid_indices)-2}]"
 
         filter_complex = ";".join(filter_parts)
 
+        # Audio Setup
+        audio_args = []
         if music_path and os.path.exists(music_path):
-            # Music input index = len(valid_paths) since slides come first
-            music_idx = len(valid_paths)
+            inputs += ["-i", music_path]
+            music_idx = len(valid_indices)
             audio_filter = (
                 f"[{music_idx}:a]aloop=loop=-1:size=2e+09,"
                 f"atrim=duration={total_duration},"
@@ -148,43 +175,32 @@ class ReelGenerator:
                 f"afade=t=out:st={total_duration-2}:d=2,"
                 f"volume=0.3[aout]"
             )
-            cmd = (
-                ["ffmpeg"] + inputs + ["-i", music_path] + [
-                    "-filter_complex", f"{filter_complex};{audio_filter}",
-                    "-map", final_video,
-                    "-map", "[aout]",
-                    "-t", str(total_duration),
-                    "-c:v", "libx264",
-                    "-c:a", "aac",
-                    "-pix_fmt", "yuv420p",
-                    "-y", output_path
-                ]
-            )
-        else:
-            cmd = (
-                ["ffmpeg"] + inputs + [
-                    "-filter_complex", filter_complex,
-                    "-map", final_video,
-                    "-t", str(total_duration),
-                    "-c:v", "libx264",
-                    "-pix_fmt", "yuv420p",
-                    "-y", output_path
-                ]
-            )
+            filter_complex += f";{audio_filter}"
+            audio_args = ["-map", "[aout]", "-c:a", "aac"]
+        
+        cmd = (
+            ["ffmpeg"] + inputs + [
+                "-filter_complex", filter_complex,
+                "-map", final_video
+            ] + audio_args + [
+                "-t", str(total_duration),
+                "-c:v", "libx264",
+                "-pix_fmt", "yuv420p",
+                "-preset", "faster",
+                "-y", output_path
+            ]
+        )
 
-        print(f"Running FFmpeg: {len(valid_paths)} slides, {total_duration}s, music={'yes' if music_path else 'no'}")
+        print(f"Running FFmpeg: {len(valid_indices)} slides, {total_duration}s, Premium Effects")
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
             if result.returncode != 0:
                 print(f"FFmpeg stderr:\n{result.stderr[-2000:]}")
                 return None
-            print(f"Reel video created: {os.path.getsize(output_path)//1024}KB")
+            print(f"Premium Reel video created: {os.path.getsize(output_path)//1024}KB")
             return output_path
-        except subprocess.TimeoutExpired:
-            print("FFmpeg timed out after 180 seconds.")
-            return None
-        except FileNotFoundError:
-            print("FFmpeg not found. Make sure it's installed in the Docker image.")
+        except Exception as e:
+            print(f"FFmpeg error: {e}")
             return None
 
     def upload_video_to_imgur(self, video_path: str) -> str | None:
@@ -212,21 +228,26 @@ class ReelGenerator:
             print(f"Imgur video upload error: {e}")
             return None
 
-    async def generate_reel(self, slide_prompts: list[str]) -> str | None:
-        """Full pipeline: DALL-E → local files → FFmpeg video → Imgur hosting."""
+    async def generate_reel(self, slides: list[dict]) -> str | None:
+        """Full pipeline: DALL-E → local files → FFmpeg video with overlays → Imgur hosting."""
+        if not slides:
+            print("No slides provided.")
+            return None
+
+        slide_prompts = [s.get("image_prompt") for s in slides if s.get("image_prompt")]
         if not slide_prompts:
-            print("No slide prompts provided.")
+            print("No image prompts in slides.")
             return None
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            # 1. Generate images and save locally (direct DALL-E download, no Imgur)
+            # 1. Generate images and save locally
             local_paths = await self.generate_and_save_slide_images(slide_prompts, tmp_dir)
 
-            # 2. Download music (optional, falls back to silent)
+            # 2. Download music
             music_path = self.download_music(tmp_dir)
 
-            # 3. Compose video using local image files
-            video_path = self.create_reel_video(local_paths, music_path, tmp_dir)
+            # 3. Compose video using slides (for text) and local images
+            video_path = self.create_reel_video(local_paths, slides, music_path, tmp_dir)
             if not video_path:
                 print("Reel video creation failed.")
                 return None

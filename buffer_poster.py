@@ -15,6 +15,7 @@ class BufferPoster:
         self.linkedin_agency_profile = os.getenv("BUFFER_LINKEDIN_AGENCY_PROFILE_ID")
         self.instagram_profile = os.getenv("BUFFER_INSTAGRAM_PROFILE_ID")
         self.youtube_profile = os.getenv("BUFFER_YOUTUBE_PROFILE_ID")
+        self.twitter_profile = os.getenv("BUFFER_TWITTER_PROFILE_ID")
 
     def _post_graphql(self, query, variables, token=None):
         """Sends a GraphQL POST request to Buffer."""
@@ -113,6 +114,51 @@ class BufferPoster:
                         "shouldShareToFeed": True
                     }
                 },
+                "schedulingType": "automatic",
+                "mode": "customScheduled" if scheduled_at else "addToQueue"
+            }
+        }
+        
+        if image_url:
+            variables["input"]["assets"] = {
+                "images": [{"url": image_url}]
+            }
+        
+        if scheduled_at:
+            variables["input"]["dueAt"] = scheduled_at
+            
+        return self._post_graphql(mutation, variables, token=self.personal_token)
+
+    def post_to_twitter(self, text, image_url=None, scheduled_at=None):
+        """Schedules a post to Twitter/X via Buffer GraphQL API."""
+        if not self.twitter_profile:
+            print("Twitter Channel ID not found in .env")
+            return None
+            
+        mutation = """
+        mutation CreatePost($input: CreatePostInput!) {
+          createPost(input: $input) {
+            __typename
+            ... on PostActionSuccess {
+              post {
+                id
+              }
+            }
+            ... on RestProxyError {
+              message
+              code
+            }
+            ... on UnexpectedError {
+              message
+            }
+          }
+        }
+        """
+        
+        variables = {
+            "input": {
+                "channelId": self.twitter_profile,
+                "text": text,
                 "schedulingType": "automatic",
                 "mode": "customScheduled" if scheduled_at else "addToQueue"
             }

@@ -78,6 +78,7 @@ class TelegramHandler:
             f"🚀 <b>New Content Ready for Approval!</b> (Day {day_num})\n\n"
             f"📢 <b>PERSONAL LINKEDIN (Generic):</b>\n{content.get('linkedin_personal', '')[:300]}...\n\n"
             f"🏢 <b>AGENCY LINKEDIN (Marketing):</b>\n{content.get('linkedin_agency', '')[:300]}...\n\n"
+            f"🐦 <b>TWITTER / X:</b>\n{content.get('twitter', '')[:200]}...\n\n"
             f"📸 <b>INSTAGRAM:</b>\n{content.get('instagram', '')[:200]}..."
         )
         
@@ -87,10 +88,11 @@ class TelegramHandler:
                 InlineKeyboardButton("✅ Agency LI", callback_data=f"approve_li_a_{content_id}"),
             ],
             [
+                InlineKeyboardButton("✅ Twitter", callback_data=f"approve_tw_{content_id}"),
                 InlineKeyboardButton("🎥 Instagram", callback_data=f"approve_ig_{content_id}"),
-                InlineKeyboardButton("📺 YouTube", callback_data=f"approve_yt_{content_id}"),
             ],
             [
+                InlineKeyboardButton("📺 YouTube", callback_data=f"approve_yt_{content_id}"),
                 InlineKeyboardButton("🚀 APPROVE ALL", callback_data=f"approve_all_{content_id}"),
             ],
             [
@@ -115,15 +117,16 @@ class TelegramHandler:
                     f"📄 <b>Full Preview: {content_id}</b>\n\n"
                     f"<b>(Personal) LinkedIn:</b>\n{content.get('linkedin_personal')}\n\n"
                     f"<b>(Agency) LinkedIn:</b>\n{content.get('linkedin_agency')}\n\n"
+                    f"<b>Twitter / X:</b>\n{content.get('twitter')}\n\n"
                     f"<b>Instagram Caption:</b>\n{content.get('instagram')}"
                 )
                 
                 # Split if too long (Telegram limit ~4000)
                 if len(full_text) > 4000:
-                    await self.app.bot.send_message(chat_id=self.chat_id, text=full_text[:4000], parse_mode='HTML')
-                    await self.app.bot.send_message(chat_id=self.chat_id, text=full_text[4000:], parse_mode='HTML')
+                    await self.app.bot.send_message(chat_id=self.chat_id, text=self._clean_text(full_text[:4000]), parse_mode='HTML')
+                    await self.app.bot.send_message(chat_id=self.chat_id, text=self._clean_text(full_text[4000:]), parse_mode='HTML')
                 else:
-                    await self.app.bot.send_message(chat_id=self.chat_id, text=full_text, parse_mode='HTML')
+                    await self.app.bot.send_message(chat_id=self.chat_id, text=self._clean_text(full_text), parse_mode='HTML')
                     
             except Exception as e:
                 print(f"Telegram error in send_for_approval: {e}")

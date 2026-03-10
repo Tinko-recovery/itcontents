@@ -287,6 +287,7 @@ class ContentEngineAPP:
                     # Data looks like: approve_li_p_day_1
                     if "approve_li_p" in query.data: p_key, label = "li_p", "Personal LinkedIn"
                     elif "approve_li_a" in query.data: p_key, label = "li_a", "Agency LinkedIn"
+                    elif "approve_tw" in query.data: p_key, label = "tw", "Twitter / X"
                     elif "approve_ig" in query.data: p_key, label = "ig", "Instagram"
                     elif "approve_yt" in query.data: p_key, label = "yt", "YouTube"
                     elif "approve_all" in query.data: p_key, label = "all", "All Channels"
@@ -298,6 +299,7 @@ class ContentEngineAPP:
                     import datetime as dt
                     tomorrow_date = dt.date.today() + dt.timedelta(days=1)
                     li_time = dt.datetime.combine(tomorrow_date, dt.time(9, 0)).isoformat() + "Z"
+                    tw_time = dt.datetime.combine(tomorrow_date, dt.time(10, 0)).isoformat() + "Z"
                     ig_time = dt.datetime.combine(tomorrow_date, dt.time(11, 0)).isoformat() + "Z"
                     yt_time = dt.datetime.combine(tomorrow_date, dt.time(13, 0)).isoformat() + "Z"
                     
@@ -332,6 +334,10 @@ class ContentEngineAPP:
                     if p_key in ["li_a", "all"]:
                         res = self.buffer_poster.post_to_linkedin(content_data["linkedin_agency"], profile_type="agency", image_url=image_url, scheduled_at=li_time)
                         status_msg += f"📅 Agency LI: {'Scheduled ✅' if res and 'data' in res else 'FAILED ❌'}\n"
+
+                    if p_key in ["tw", "all"] and content_data.get("twitter"):
+                        tw_res = self.buffer_poster.post_to_twitter(content_data["twitter"], image_url=image_url, scheduled_at=tw_time)
+                        status_msg += f"📅 Twitter / X: {'Scheduled ✅' if tw_res and 'data' in tw_res else 'FAILED ❌'}\n"
 
                     if p_key in ["ig", "all"]:
                         if reel_url:
