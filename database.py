@@ -11,12 +11,20 @@ from datetime import datetime
 
 
 def get_db():
-    """Return a new psycopg2 connection with dict-like row access."""
+    """Return a new psycopg2 connection with dict-like row access.
+    Uses Supabase transaction-mode pooler (IPv4, port 6543) by default."""
     url = os.getenv("DATABASE_URL", "")
+    if not url:
+        raise RuntimeError("DATABASE_URL environment variable is not set")
     # Supabase/Heroku sometimes emit postgres:// — psycopg2 needs postgresql://
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
-    return psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
+    # Disable prepared statements — required for Supabase transaction pooler
+    return psycopg2.connect(
+        url,
+        cursor_factory=psycopg2.extras.RealDictCursor,
+        options="-c statement_timeout=30000",
+    )
 
 
 def init_db():
