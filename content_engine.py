@@ -265,6 +265,149 @@ class ContentEngine:
         
         return parsed
 
+    # ─── New topic-based generation (web UI entry point) ─────────────────────
+
+    async def generate_for_topic(self, topic: str, brand_config: dict | None = None):
+        """Generate all platform content for a free-form topic string.
+
+        brand_config keys (all optional):
+            brand_name, brand_voice, persona, target_audience, cta, website
+        """
+        cfg = brand_config or {}
+        brand_name      = cfg.get("brand_name") or self.company_name or "Our Brand"
+        brand_voice     = cfg.get("brand_voice") or "Professional, insightful, and engaging"
+        persona         = cfg.get("persona") or "Thought leader and industry expert"
+        target_audience = cfg.get("target_audience") or "Business professionals and decision-makers"
+        cta             = cfg.get("cta") or ""
+        website         = cfg.get("website") or ""
+
+        cta_line = f"CTA: {cta}" if cta else ""
+        website_line = f"Website: {website}" if website else ""
+
+        prompt = (
+            f"You are a world-class content marketer and copywriter.\n\n"
+            f"BRIEF\n"
+            f"Topic: {topic}\n"
+            f"Brand: {brand_name}\n"
+            f"Brand Voice: {brand_voice}\n"
+            f"Persona: {persona}\n"
+            f"Target Audience: {target_audience}\n"
+            f"{cta_line}\n"
+            f"{website_line}\n\n"
+            "Generate 6 publication-ready pieces of content. Follow platform best practices precisely.\n\n"
+            "---LINKEDIN_PERSONAL---\n"
+            "Write from the founder/leader's PERSONAL perspective.\n"
+            "• Start with a powerful, scroll-stopping hook (NOT 'I learned that...')\n"
+            "• Share a specific insight, observation, or contrarian opinion about the topic\n"
+            "• 150–300 words. NO hashtags.\n"
+            "• End with a thought-provoking question to drive comments\n"
+            "• Tone: professional yet authentically human\n\n"
+            "---LINKEDIN_AGENCY---\n"
+            f"Write from {brand_name}'s company page perspective.\n"
+            "• Lead with a bold value statement\n"
+            "• Explain how this topic connects to what the brand does\n"
+            f"• Weave in the CTA naturally: {cta}\n"
+            "• 100–200 words. 3–5 relevant hashtags at the very end.\n\n"
+            "---TWITTER---\n"
+            "A single punchy tweet. Max 240 characters.\n"
+            "Sharp, opinionated, or surprising take. 1–2 hashtags only.\n\n"
+            "---INSTAGRAM---\n"
+            "• First line: scroll-stopping hook (no emojis as the opening word)\n"
+            "• Body: 3–5 sentences of genuine value\n"
+            f"• End with: {cta if cta else 'a clear call to action'}\n"
+            "• 10–15 relevant hashtags on a separate line at the end\n\n"
+            "---BLOG---\n"
+            "Write a complete, SEO-optimised blog post.\n"
+            "• 700–1000 words\n"
+            "• First line must be: TITLE: [an engaging, keyword-rich title]\n"
+            "• Structure: Introduction → 3–4 sections with <h2> headings → Conclusion with CTA\n"
+            "• Format the full body as clean HTML using <h2>, <h3>, <p>, <ul>, <li> tags\n"
+            "• Practical insights, not generic advice\n"
+            f"• Close with a CTA referencing: {cta if cta else brand_name}\n\n"
+            "---IMAGE_PROMPT---\n"
+            "A detailed DALL-E image prompt.\n"
+            "• Cinematic, photorealistic or high-quality illustration style\n"
+            "• Dramatically lit, modern aesthetic that represents the topic visually\n"
+            "• NO text, words, or letters in the image\n"
+            "• Describe composition, lighting, color palette, and mood"
+        )
+
+        response = await self.ant_client.messages.create(
+            model=self.model,
+            max_tokens=5000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        parsed = self._parse_topic_content(response.content[0].text)
+
+        # Generate image
+        if parsed.get("image_prompt"):
+            print(f"Generating image for topic: {topic[:60]}...")
+            try:
+                img_res = await self.oa_client.images.generate(
+                    model="dall-e-3",
+                    prompt=parsed["image_prompt"],
+                    size="1024x1024",
+                    quality="standard",
+                    n=1,
+                )
+                temp_url = img_res.data[0].url
+                permanent_url = self._reupload_to_imgur(temp_url)
+                parsed["image_url"] = permanent_url or temp_url
+                print(f"Image ready: {parsed['image_url']}")
+            except Exception as e:
+                print(f"Image generation failed: {e}")
+                parsed["image_url"] = None
+        else:
+            parsed["image_url"] = None
+
+        return parsed
+
+    def _parse_topic_content(self, content: str) -> dict:
+        """Parse the generate_for_topic response into a structured dict."""
+        import re
+
+        parsed = {
+            "linkedin_personal": "",
+            "linkedin_agency": "",
+            "twitter": "",
+            "instagram": "",
+            "blog_title": "",
+            "blog_content": "",
+            "image_prompt": "",
+        }
+
+        patterns = {
+            "linkedin_personal": r"---LINKEDIN_PERSONAL---(.*?)---LINKEDIN_AGENCY---",
+            "linkedin_agency":   r"---LINKEDIN_AGENCY---(.*?)---TWITTER---",
+            "twitter":           r"---TWITTER---(.*?)---INSTAGRAM---",
+            "instagram":         r"---INSTAGRAM---(.*?)---BLOG---",
+            "blog":              r"---BLOG---(.*?)---IMAGE_PROMPT---",
+            "image_prompt":      r"---IMAGE_PROMPT---(.*?)$",
+        }
+
+        for key, pattern in patterns.items():
+            match = re.search(pattern, content, re.DOTALL)
+            if match:
+                parsed[key] = match.group(1).strip()
+
+        # Extract TITLE: line from blog block
+        blog_raw = parsed.pop("blog", "")
+        title_match = re.match(r"TITLE:\s*(.+)", blog_raw)
+        if title_match:
+            parsed["blog_title"] = title_match.group(1).strip()
+            parsed["blog_content"] = blog_raw[title_match.end():].strip()
+        else:
+            parsed["blog_content"] = blog_raw
+
+        # Clean image prompt
+        parsed["image_prompt"] = (
+            parsed["image_prompt"].replace("```", "").strip()
+        )
+
+        return parsed
+
+
 if __name__ == "__main__":
     # Test generation
     import asyncio

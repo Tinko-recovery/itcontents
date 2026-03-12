@@ -3,6 +3,8 @@ token.json
 credentials.json
 approvals.json
 last_run.txt
+content_ai.db
+user_config.json
 __pycache__/
 *.pyc
 .ipynb_checkpoints/

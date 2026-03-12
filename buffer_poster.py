@@ -5,17 +5,35 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class BufferPoster:
-    def __init__(self):
-        # Tokens
-        self.personal_token = os.getenv("BUFFER_PERSONAL_ACCESS_TOKEN") or os.getenv("BUFFER_ACCESS_TOKEN")
-        self.agency_token = os.getenv("BUFFER_AGENCY_ACCESS_TOKEN") or os.getenv("BUFFER_ACCESS_TOKEN")
-        
+    def __init__(
+        self,
+        access_token=None,
+        agency_token=None,
+        linkedin_personal_id=None,
+        linkedin_agency_id=None,
+        instagram_id=None,
+        youtube_id=None,
+        twitter_id=None,
+    ):
+        """All params are optional — falls back to env vars if not provided.
+        Pass them directly when loading credentials from user_config.json."""
+        self.personal_token = (
+            access_token
+            or os.getenv("BUFFER_PERSONAL_ACCESS_TOKEN")
+            or os.getenv("BUFFER_ACCESS_TOKEN")
+        )
+        self.agency_token = (
+            agency_token
+            or access_token
+            or os.getenv("BUFFER_AGENCY_ACCESS_TOKEN")
+            or os.getenv("BUFFER_ACCESS_TOKEN")
+        )
         self.base_url = "https://api.bufferapp.com/1"
-        self.linkedin_personal_profile = os.getenv("BUFFER_LINKEDIN_PERSONAL_PROFILE_ID")
-        self.linkedin_agency_profile = os.getenv("BUFFER_LINKEDIN_AGENCY_PROFILE_ID")
-        self.instagram_profile = os.getenv("BUFFER_INSTAGRAM_PROFILE_ID")
-        self.youtube_profile = os.getenv("BUFFER_YOUTUBE_PROFILE_ID")
-        self.twitter_profile = os.getenv("BUFFER_TWITTER_PROFILE_ID")
+        self.linkedin_personal_profile = linkedin_personal_id or os.getenv("BUFFER_LINKEDIN_PERSONAL_PROFILE_ID")
+        self.linkedin_agency_profile   = linkedin_agency_id   or os.getenv("BUFFER_LINKEDIN_AGENCY_PROFILE_ID")
+        self.instagram_profile         = instagram_id         or os.getenv("BUFFER_INSTAGRAM_PROFILE_ID")
+        self.youtube_profile           = youtube_id           or os.getenv("BUFFER_YOUTUBE_PROFILE_ID")
+        self.twitter_profile           = twitter_id           or os.getenv("BUFFER_TWITTER_PROFILE_ID")
 
     def _post_graphql(self, query, variables, token=None):
         """Sends a GraphQL POST request to Buffer."""

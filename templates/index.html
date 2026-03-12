@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ContentAI — Generate. Review. Post.</title>
+<style>
+:root {
+  --bg:       #09090f;
+  --surface:  #10101a;
+  --card:     #17172a;
+  --card2:    #1d1d32;
+  --border:   #2b2b45;
+  --primary:  #6d28d9;
+  --primary-h:#7c3aed;
+  --accent:   #06b6d4;
+  --text:     #e8e8f4;
+  --muted:    #8888aa;
+  --success:  #10b981;
+  --error:    #ef4444;
+  --warn:     #f59e0b;
+  --radius:   12px;
+  --shadow:   0 4px 32px rgba(0,0,0,.5);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ── HEADER ── */
+header {
+  background: linear-gradient(135deg, #1a0a3a 0%, #0a1a3a 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 18px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+  backdrop-filter: blur(12px);
+}
+.logo { display: flex; align-items: center; gap: 12px; }
+.logo-icon {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+.logo h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.3px; }
+.logo span { color: var(--accent); }
+.header-status { display: flex; gap: 8px; flex-wrap: wrap; }
+.status-dot {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; color: var(--muted);
+  background: var(--card); padding: 4px 10px;
+  border-radius: 20px; border: 1px solid var(--border);
+}
+.status-dot.ok::before  { content:''; width:6px; height:6px; border-radius:50%; background:var(--success); }
+.status-dot.err::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--error); }
+.status-dot.warn::before{ content:''; width:6px; height:6px; border-radius:50%; background:var(--warn); }
+
+/* ── LAYOUT ── */
+main { max-width: 980px; margin: 0 auto; padding: 32px 20px 80px; }
+
+/* ── CARD ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+.card-title {
+  font-size: 13px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .8px;
+  margin-bottom: 14px;
+}
+
+/* ── TOPIC INPUT ── */
+.topic-area {
+  width: 100%; min-height: 90px;
+  background: #0d0d1c; border: 2px solid var(--border);
+  border-radius: 10px; color: var(--text);
+  font-size: 1.05rem; padding: 16px; resize: vertical;
+  transition: border-color .2s;
+  font-family: inherit;
+}
+.topic-area:focus { outline: none; border-color: var(--primary); }
+.topic-area::placeholder { color: #44446a; }
+
+/* ── BRAND SETTINGS (collapsible) ── */
+.collapsible-header {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; user-select: none;
+}
+.collapsible-header .chevron {
+  color: var(--muted); font-size: 12px;
+  transition: transform .25s;
+}
+.collapsible-header.open .chevron { transform: rotate(180deg); }
+.collapsible-body {
+  display: none; padding-top: 18px;
+}
+.collapsible-body.open { display: block; }
+
+.field-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+@media (max-width: 600px) { .field-grid { grid-template-columns: 1fr; } }
+
+label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 5px; }
+input[type=text], input[type=url], input[type=datetime-local], input[type=password], select, textarea {
+  width: 100%;
+  background: #0d0d1c; border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text);
+  padding: 10px 12px; font-size: 14px; font-family: inherit;
+  transition: border-color .2s;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
+select { appearance: none; cursor: pointer; }
+select option { background: #1a1a2e; }
+
+/* ── PLATFORMS ── */
+.platforms-grid {
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+.platform-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 30px;
+  border: 2px solid var(--border);
+  background: var(--card2); cursor: pointer;
+  transition: all .2s; user-select: none; font-size: 14px;
+}
+.platform-chip:hover { border-color: var(--primary-h); background: #23233d; }
+.platform-chip.active { border-color: var(--primary); background: #2d1a5a; color: #c4b5fd; }
+.platform-chip .icon { font-size: 16px; }
+.platform-chip input { display: none; }
+
+/* ── BLOG EXTRA FIELDS ── */
+#blog-config { display: none; }
+
+/* ── GENERATE BUTTON ── */
+.btn-generate {
+  width: 100%; padding: 16px;
+  background: linear-gradient(135deg, var(--primary) 0%, #4c1d95 100%);
+  color: #fff; border: none; border-radius: var(--radius);
+  font-size: 1.05rem; font-weight: 700; cursor: pointer;
+  letter-spacing: .3px;
+  transition: opacity .2s, transform .1s;
+  margin-top: 8px;
+}
+.btn-generate:hover:not(:disabled) { opacity: .88; transform: translateY(-1px); }
+.btn-generate:disabled { opacity: .45; cursor: not-allowed; }
+.btn-generate.loading { opacity: .65; }
+
+/* ── LOADING SPINNER ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  vertical-align: middle; margin-right: 8px;
+}
+
+/* ── DIVIDER ── */
+.section-divider {
+  display: flex; align-items: center; gap: 14px;
+  margin: 28px 0 20px; color: var(--muted); font-size: 13px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .8px;
+}
+.section-divider::before, .section-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+/* ── PREVIEW ── */
+#preview-section { display: none; }
+.preview-grid {
+  display: grid; grid-template-columns: 280px 1fr; gap: 20px;
+}
+@media (max-width: 700px) { .preview-grid { grid-template-columns: 1fr; } }
+
+.image-panel {
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  min-height: 280px; padding: 12px;
+}
+.image-panel img {
+  width: 100%; border-radius: 8px; display: none;
+}
+.image-placeholder {
+  color: var(--muted); font-size: 13px; text-align: center; padding: 24px;
+}
+.image-placeholder .ph-icon { font-size: 40px; display: block; margin-bottom: 8px; }
+
+/* ── TABS ── */
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 14px; }
+.tab-btn {
+  padding: 7px 14px; border-radius: 8px;
+  background: var(--card2); border: 1px solid var(--border);
+  color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 500;
+  transition: all .15s;
+}
+.tab-btn:hover { color: var(--text); border-color: #4a4a6a; }
+.tab-btn.active { background: #2d1a5a; border-color: var(--primary); color: #c4b5fd; }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.content-textarea {
+  width: 100%; min-height: 200px;
+  background: #0d0d1c; border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text);
+  padding: 14px; font-size: 14px; resize: vertical;
+  font-family: inherit; line-height: 1.6;
+  transition: border-color .2s;
+}
+.content-textarea:focus { outline: none; border-color: var(--primary); }
+
+.char-counter {
+  text-align: right; font-size: 12px; color: var(--muted); margin-top: 6px;
+}
+.char-counter.warn { color: var(--warn); }
+.char-counter.over { color: var(--error); }
+
+/* ── POST SECTION ── */
+#post-section { display: none; }
+.post-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 600px) { .post-grid { grid-template-columns: 1fr; } }
+
+.toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.toggle-row:last-child { border-bottom: none; }
+.toggle-label { font-size: 14px; }
+.toggle-label small { color: var(--muted); display: block; font-size: 12px; }
+
+.toggle {
+  position: relative; width: 44px; height: 24px;
+  display: inline-block;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute; inset: 0;
+  background: #333355; border-radius: 24px; cursor: pointer;
+  transition: background .2s;
+}
+.slider::before {
+  content: ''; position: absolute;
+  width: 18px; height: 18px; left: 3px; top: 3px;
+  background: white; border-radius: 50%;
+  transition: transform .2s;
+}
+.toggle input:checked + .slider { background: var(--primary); }
+.toggle input:checked + .slider::before { transform: translateX(20px); }
+
+.btn-post {
+  width: 100%; padding: 15px;
+  background: linear-gradient(135deg, #059669 0%, #064e3b 100%);
+  color: #fff; border: none; border-radius: var(--radius);
+  font-size: 1rem; font-weight: 700; cursor: pointer;
+  transition: opacity .2s; margin-top: 16px;
+  letter-spacing: .3px;
+}
+.btn-post:hover:not(:disabled) { opacity: .88; }
+.btn-post:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ── RESULTS ── */
+#results-section { display: none; }
+.result-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-radius: 8px;
+  background: var(--card2); margin-bottom: 8px;
+  border: 1px solid var(--border);
+}
+.result-label { font-size: 14px; font-weight: 500; }
+.result-badge {
+  font-size: 12px; padding: 3px 10px; border-radius: 20px; font-weight: 600;
+}
+.result-badge.ok  { background: #064e3b; color: #6ee7b7; }
+.result-badge.fail { background: #450a0a; color: #fca5a5; }
+.result-badge.skip { background: #1a1a2e; color: var(--muted); }
+
+/* ── TOAST ── */
+#toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 999;
+  padding: 12px 20px; border-radius: 10px;
+  font-size: 14px; font-weight: 500;
+  opacity: 0; transform: translateY(10px);
+  transition: all .3s; pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateY(0); }
+#toast.ok   { background: #064e3b; border: 1px solid #059669; color: #a7f3d0; }
+#toast.err  { background: #450a0a; border: 1px solid var(--error); color: #fca5a5; }
+
+/* ── SETTINGS PANEL ── */
+#settings-overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
+}
+#settings-overlay.open { display: block; }
+#settings-panel {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 201;
+  width: min(480px, 100vw);
+  background: #13131f; border-left: 1px solid var(--border);
+  overflow-y: auto; padding: 28px 24px;
+  transform: translateX(100%); transition: transform .3s ease;
+}
+#settings-panel.open { transform: translateX(0); }
+.settings-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 24px;
+}
+.settings-title { font-size: 1.1rem; font-weight: 700; }
+.settings-close {
+  background: var(--card2); border: 1px solid var(--border);
+  color: var(--muted); width: 32px; height: 32px; border-radius: 8px;
+  cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;
+}
+.settings-section { margin-bottom: 24px; }
+.settings-section-title {
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .8px;
+  margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+}
+.settings-section-title::after {
+  content:''; flex:1; height:1px; background: var(--border);
+}
+.btn-sm {
+  padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  border: 1px solid var(--primary); background: transparent;
+  color: #c4b5fd; cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.btn-sm:hover { background: #2d1a5a; }
+.channel-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+}
+.channel-icon { font-size: 16px; width: 24px; text-align: center; flex-shrink: 0; }
+.channel-row select, .channel-row input { flex: 1; }
+.btn-save-settings {
+  width: 100%; padding: 13px;
+  background: linear-gradient(135deg, var(--primary) 0%, #4c1d95 100%);
+  color: #fff; border: none; border-radius: var(--radius);
+  font-size: .95rem; font-weight: 700; cursor: pointer; margin-top: 8px;
+  transition: opacity .2s;
+}
+.btn-save-settings:hover { opacity: .88; }
+.gear-btn {
+  background: var(--card2); border: 1px solid var(--border);
+  color: var(--muted); padding: 5px 10px; border-radius: 8px;
+  cursor: pointer; font-size: 16px; transition: all .15s; line-height: 1;
+}
+.gear-btn:hover { color: var(--text); border-color: #4a4a6a; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">✦</div>
+    <h1>Content<span>AI</span></h1>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div class="header-status" id="header-status">
+      <div class="status-dot warn">checking…</div>
+    </div>
+    <button class="gear-btn" onclick="openSettings()" title="Settings">⚙</button>
+    {% if current_user %}
+    <div style="display:flex;align-items:center;gap:8px;border-left:1px solid var(--border);padding-left:12px;">
+      {% if current_user.picture %}
+      <img src="{{ current_user.picture }}" alt="" style="width:28px;height:28px;border-radius:50%;">
+      {% endif %}
+      <span style="font-size:13px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+        {{ current_user.name or current_user.email }}
+      </span>
+      <span style="font-size:11px;padding:2px 8px;border-radius:12px;background:#2d1a5a;color:#c4b5fd;font-weight:600;">
+        {{ current_user.plan }}
+      </span>
+      <a href="/logout" style="font-size:12px;color:var(--muted);padding:4px 8px;border:1px solid var(--border);border-radius:6px;transition:all .15s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Sign out</a>
+    </div>
+    {% endif %}
+  </div>
+</header>
+
+<!-- ── SETTINGS PANEL ──────────────────────────────────────────── -->
+<div id="settings-overlay" onclick="closeSettings()"></div>
+<div id="settings-panel">
+  <div class="settings-header">
+    <span class="settings-title">⚙ Settings</span>
+    <button class="settings-close" onclick="closeSettings()">✕</button>
+  </div>
+
+  <!-- Buffer -->
+  <div class="settings-section">
+    <div class="settings-section-title">Buffer</div>
+    <div style="margin-bottom:10px;">
+      <label>API Token <small style="color:var(--muted)">— buffer.com → Account → Apps &amp; API</small></label>
+      <div style="display:flex;gap:8px;margin-top:5px;">
+        <input type="password" id="s-buffer-token" placeholder="Paste your Buffer access token">
+        <button class="btn-sm" onclick="fetchChannels()">Fetch Channels</button>
+      </div>
+    </div>
+    <div id="channel-fields">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">
+        Paste your Buffer token and click <b>Fetch Channels</b> to auto-populate, or enter channel IDs manually.
+      </p>
+      <div class="channel-row">
+        <span class="channel-icon">💼</span>
+        <label style="width:130px;margin:0;font-size:13px;">LinkedIn Personal</label>
+        <select id="s-ch-linkedin_personal"><option value="">— select —</option></select>
+      </div>
+      <div class="channel-row">
+        <span class="channel-icon">🏢</span>
+        <label style="width:130px;margin:0;font-size:13px;">LinkedIn Brand</label>
+        <select id="s-ch-linkedin_agency"><option value="">— select —</option></select>
+      </div>
+      <div class="channel-row">
+        <span class="channel-icon">𝕏</span>
+        <label style="width:130px;margin:0;font-size:13px;">Twitter / X</label>
+        <select id="s-ch-twitter"><option value="">— select —</option></select>
+      </div>
+      <div class="channel-row">
+        <span class="channel-icon">📸</span>
+        <label style="width:130px;margin:0;font-size:13px;">Instagram</label>
+        <select id="s-ch-instagram"><option value="">— select —</option></select>
+      </div>
+      <div class="channel-row">
+        <span class="channel-icon">▶</span>
+        <label style="width:130px;margin:0;font-size:13px;">YouTube</label>
+        <select id="s-ch-youtube"><option value="">— select —</option></select>
+      </div>
+    </div>
+  </div>
+
+  <!-- WordPress -->
+  <div class="settings-section">
+    <div class="settings-section-title">Blog / WordPress</div>
+    <div style="display:grid;gap:10px;">
+      <div>
+        <label>Site URL</label>
+        <input type="url" id="s-wp-url" placeholder="https://yourblog.com">
+      </div>
+      <div>
+        <label>Username</label>
+        <input type="text" id="s-wp-user" placeholder="admin">
+      </div>
+      <div>
+        <label>Application Password</label>
+        <input type="password" id="s-wp-pass" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx">
+      </div>
+    </div>
+  </div>
+
+  <!-- Telegram -->
+  <div class="settings-section">
+    <div class="settings-section-title">Telegram (optional notifications)</div>
+    <div style="display:grid;gap:10px;">
+      <div>
+        <label>Bot Token</label>
+        <input type="password" id="s-tg-token" placeholder="123456:ABCdef…">
+      </div>
+      <div>
+        <label>Chat ID</label>
+        <input type="text" id="s-tg-chat" placeholder="-100123456789 or @channel">
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-save-settings" onclick="saveSettings()">💾 Save Settings</button>
+  <p style="font-size:12px;color:var(--muted);margin-top:10px;text-align:center;">
+    Credentials are stored in <code>user_config.json</code> on this server.
+  </p>
+</div>
+
+<main>
+
+  <!-- ── TOPIC ─────────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">What do you want to create content about?</div>
+    <textarea
+      id="topic"
+      class="topic-area"
+      rows="3"
+      placeholder="e.g. How generative AI is replacing traditional copywriting — and what marketers should do about it"
+    ></textarea>
+  </div>
+
+  <!-- ── BRAND SETTINGS (collapsible) ──────────────────────────── -->
+  <div class="card">
+    <div class="collapsible-header" id="brand-toggle">
+      <span class="card-title" style="margin:0">Brand Settings</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="collapsible-body" id="brand-body">
+      <div class="field-grid">
+        <div>
+          <label>Brand / Company Name</label>
+          <input type="text" id="brand_name" placeholder="Acme Corp">
+        </div>
+        <div>
+          <label>Brand Voice</label>
+          <select id="brand_voice">
+            <option value="Professional and authoritative">Professional &amp; Authoritative</option>
+            <option value="Conversational and friendly">Conversational &amp; Friendly</option>
+            <option value="Bold, punchy and provocative">Bold &amp; Provocative</option>
+            <option value="Educational and informative">Educational &amp; Informative</option>
+            <option value="Inspirational and motivational">Inspirational &amp; Motivational</option>
+            <option value="custom">Custom…</option>
+          </select>
+        </div>
+        <div id="custom-voice-wrap" style="display:none; grid-column:1/-1;">
+          <label>Custom Brand Voice</label>
+          <input type="text" id="custom_voice" placeholder="Describe your brand voice…">
+        </div>
+        <div>
+          <label>Persona (who's writing)</label>
+          <input type="text" id="persona" placeholder="Founder and AI enthusiast">
+        </div>
+        <div>
+          <label>Target Audience</label>
+          <input type="text" id="target_audience" placeholder="SaaS founders and marketing leads">
+        </div>
+        <div>
+          <label>Call to Action</label>
+          <input type="text" id="cta" placeholder="Book a free audit at acme.com/audit">
+        </div>
+        <div>
+          <label>Website URL</label>
+          <input type="url" id="website" placeholder="https://acme.com">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PLATFORMS ─────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">Post To</div>
+    <div class="platforms-grid" id="platforms">
+      <label class="platform-chip active" data-platform="linkedin_personal">
+        <input type="checkbox" value="linkedin_personal" checked>
+        <span class="icon">💼</span> LinkedIn Personal
+      </label>
+      <label class="platform-chip active" data-platform="linkedin_agency">
+        <input type="checkbox" value="linkedin_agency" checked>
+        <span class="icon">🏢</span> LinkedIn Brand
+      </label>
+      <label class="platform-chip active" data-platform="twitter">
+        <input type="checkbox" value="twitter" checked>
+        <span class="icon">𝕏</span> Twitter / X
+      </label>
+      <label class="platform-chip active" data-platform="instagram">
+        <input type="checkbox" value="instagram" checked>
+        <span class="icon">📸</span> Instagram
+      </label>
+      <label class="platform-chip" data-platform="youtube">
+        <input type="checkbox" value="youtube">
+        <span class="icon">▶</span> YouTube
+      </label>
+      <label class="platform-chip" data-platform="blog" id="blog-chip">
+        <input type="checkbox" value="blog">
+        <span class="icon">📝</span> Blog / WordPress
+      </label>
+    </div>
+  </div>
+
+  <!-- ── BLOG CONFIG (shows when Blog is selected) ─────────────── -->
+  <div class="card" id="blog-config">
+    <div class="card-title">WordPress Settings</div>
+    <div class="field-grid">
+      <div>
+        <label>WordPress Site URL</label>
+        <input type="url" id="wp_url" placeholder="https://yourblog.com">
+      </div>
+      <div>
+        <label>Username</label>
+        <input type="text" id="wp_user" placeholder="admin">
+      </div>
+      <div style="grid-column:1/-1;">
+        <label>Application Password <small style="color:var(--muted);">(Settings → Users → Application Passwords)</small></label>
+        <input type="password" id="wp_pass" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx">
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GENERATE ──────────────────────────────────────────────── -->
+  <button class="btn-generate" id="generate-btn" onclick="generateContent()">
+    ✦ Generate Content
+  </button>
+
+  <!-- ── PREVIEW ───────────────────────────────────────────────── -->
+  <div id="preview-section">
+    <div class="section-divider">Generated Content</div>
+
+    <div class="preview-grid">
+
+      <!-- Image -->
+      <div class="image-panel">
+        <div class="image-placeholder" id="img-placeholder">
+          <span class="ph-icon">🖼</span>
+          Generating AI image…
+        </div>
+        <img id="preview-img" alt="AI generated image">
+      </div>
+
+      <!-- Content tabs -->
+      <div>
+        <div class="tabs" id="content-tabs">
+          <button class="tab-btn active" onclick="switchTab('linkedin_personal', this)">LinkedIn</button>
+          <button class="tab-btn" onclick="switchTab('linkedin_agency', this)">LI Brand</button>
+          <button class="tab-btn" onclick="switchTab('twitter', this)">Twitter/X</button>
+          <button class="tab-btn" onclick="switchTab('instagram', this)">Instagram</button>
+          <button class="tab-btn" onclick="switchTab('blog', this)">Blog</button>
+        </div>
+
+        <div id="tab-linkedin_personal" class="tab-panel active">
+          <textarea class="content-textarea" id="ct-linkedin_personal" oninput="updateCounter(this,'c-linkedin_personal',3000)"></textarea>
+          <div class="char-counter" id="c-linkedin_personal">0 / 3000</div>
+        </div>
+        <div id="tab-linkedin_agency" class="tab-panel">
+          <textarea class="content-textarea" id="ct-linkedin_agency" oninput="updateCounter(this,'c-linkedin_agency',3000)"></textarea>
+          <div class="char-counter" id="c-linkedin_agency">0 / 3000</div>
+        </div>
+        <div id="tab-twitter" class="tab-panel">
+          <textarea class="content-textarea" id="ct-twitter" rows="4" oninput="updateCounter(this,'c-twitter',280)"></textarea>
+          <div class="char-counter" id="c-twitter">0 / 280</div>
+        </div>
+        <div id="tab-instagram" class="tab-panel">
+          <textarea class="content-textarea" id="ct-instagram" oninput="updateCounter(this,'c-instagram',2200)"></textarea>
+          <div class="char-counter" id="c-instagram">0 / 2200</div>
+        </div>
+        <div id="tab-blog" class="tab-panel">
+          <div style="margin-bottom:8px;">
+            <label>Blog Title</label>
+            <input type="text" id="ct-blog_title" style="margin-bottom:10px;">
+          </div>
+          <textarea class="content-textarea" id="ct-blog_content" rows="12" oninput="updateCounter(this,'c-blog',10000)"></textarea>
+          <div class="char-counter" id="c-blog">0 chars</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── POST OPTIONS ───────────────────────────────────────────── -->
+  <div id="post-section">
+    <div class="section-divider">Post Options</div>
+
+    <div class="card">
+      <div class="post-grid">
+        <div>
+          <div class="toggle-row">
+            <div class="toggle-label">
+              Schedule for later
+              <small>Leave blank to add to Buffer queue</small>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="schedule-toggle" onchange="toggleSchedule()">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div id="schedule-field" style="display:none; padding-top:10px;">
+            <label>Post At (your local time)</label>
+            <input type="datetime-local" id="schedule-time">
+          </div>
+        </div>
+        <div>
+          <div class="toggle-row">
+            <div class="toggle-label">
+              Telegram Notification
+              <small>Send a summary to your Telegram</small>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="telegram-toggle">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-post" id="post-btn" onclick="postContent()">
+        🚀 Post to Selected Platforms
+      </button>
+    </div>
+  </div>
+
+  <!-- ── RESULTS ────────────────────────────────────────────────── -->
+  <div id="results-section">
+    <div class="section-divider">Posting Results</div>
+    <div id="results-list"></div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────
+let currentContentId  = null;
+let _fetchedChannels  = [];   // Buffer channels from last discovery
+
+// ── Settings panel ────────────────────────────────────────────────────────
+function openSettings() {
+  document.getElementById('settings-overlay').classList.add('open');
+  document.getElementById('settings-panel').classList.add('open');
+  loadSettingsIntoForm();
+}
+function closeSettings() {
+  document.getElementById('settings-overlay').classList.remove('open');
+  document.getElementById('settings-panel').classList.remove('open');
+}
+
+async function loadSettingsIntoForm() {
+  try {
+    const res = await fetch('/api/config');
+    const cfg = await res.json();
+    // Buffer token placeholder
+    document.getElementById('s-buffer-token').placeholder =
+      cfg.buffer_token_set ? '(token saved — paste to update)' : 'Paste your Buffer access token';
+    // Channels — just set the saved value as default option
+    const ch = cfg.channels || {};
+    for (const [key, id] of Object.entries(ch)) {
+      const sel = document.getElementById(`s-ch-${key}`);
+      if (sel && id) {
+        if (![...sel.options].find(o => o.value === id)) {
+          const opt = new Option(`Saved: ${id}`, id, true, true);
+          sel.add(opt, 1);
+        } else {
+          sel.value = id;
+        }
+      }
+    }
+    // WordPress
+    const wp = cfg.wordpress || {};
+    if (wp.url)      document.getElementById('s-wp-url').value  = wp.url;
+    if (wp.username) document.getElementById('s-wp-user').value = wp.username;
+    if (wp.password_set) document.getElementById('s-wp-pass').placeholder = '(password saved)';
+    // Telegram
+    const tg = cfg.telegram || {};
+    if (tg.chat_id) document.getElementById('s-tg-chat').value = tg.chat_id;
+    if (tg.bot_token_set) document.getElementById('s-tg-token').placeholder = '(token saved)';
+  } catch(e) { /* silently ignore */ }
+}
+
+async function fetchChannels() {
+  const token = document.getElementById('s-buffer-token').value.trim();
+  if (!token) { showToast('Paste your Buffer token first', 'err'); return; }
+  showToast('Fetching channels…', 'ok');
+  try {
+    const res = await fetch(`/api/buffer/channels?token=${encodeURIComponent(token)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+    _fetchedChannels = data.channels || [];
+    populateChannelDropdowns(_fetchedChannels);
+    showToast(`Found ${_fetchedChannels.length} channel(s)`, 'ok');
+  } catch(e) {
+    showToast(e.message, 'err');
+  }
+}
+
+function populateChannelDropdowns(channels) {
+  const SERVICE_MAP = {
+    linkedin:  ['s-ch-linkedin_personal', 's-ch-linkedin_agency'],
+    twitter:   ['s-ch-twitter'],
+    instagram: ['s-ch-instagram'],
+    youtube:   ['s-ch-youtube'],
+  };
+  // Reset + repopulate
+  for (const ids of Object.values(SERVICE_MAP)) {
+    for (const id of ids) {
+      const sel = document.getElementById(id);
+      if (!sel) continue;
+      sel.innerHTML = '<option value="">— select —</option>';
+      const svc = id.includes('linkedin') ? 'linkedin'
+                : id.includes('twitter')  ? 'twitter'
+                : id.includes('instagram')? 'instagram'
+                : id.includes('youtube')  ? 'youtube' : '';
+      channels.filter(c => c.service === svc || c.service?.toLowerCase().includes(svc))
+              .forEach(c => {
+                const opt = new Option(`${c.name} (${c.type || c.service})`, c.id);
+                sel.add(opt);
+              });
+    }
+  }
+}
+
+async function saveSettings() {
+  const token = document.getElementById('s-buffer-token').value.trim();
+  const channels = {};
+  ['linkedin_personal','linkedin_agency','twitter','instagram','youtube'].forEach(k => {
+    const v = document.getElementById(`s-ch-${k}`)?.value;
+    if (v) channels[k] = v;
+  });
+  const payload = {
+    channels,
+    wordpress: {
+      url:      document.getElementById('s-wp-url').value.trim(),
+      username: document.getElementById('s-wp-user').value.trim(),
+      password: document.getElementById('s-wp-pass').value.trim(),
+    },
+    telegram: {
+      bot_token: document.getElementById('s-tg-token').value.trim(),
+      chat_id:   document.getElementById('s-tg-chat').value.trim(),
+    },
+  };
+  if (token) payload.buffer_token = token;
+
+  try {
+    const res = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Save failed');
+    showToast('Settings saved!', 'ok');
+    closeSettings();
+    // Refresh status dots
+    fetch('/api/health').then(r=>r.json()).then(updateStatusDots);
+  } catch(e) {
+    showToast(e.message, 'err');
+  }
+}
+
+function updateStatusDots(data) {
+  const c = data.configured;
+  const el = document.getElementById('header-status');
+  const items = [
+    ['AI Engine', c.anthropic && c.openai],
+    ['Buffer',    c.buffer],
+    ['Blog',      c.wordpress],
+    ['Telegram',  c.telegram],
+  ];
+  el.innerHTML = items.map(([name, ok]) =>
+    `<div class="status-dot ${ok ? 'ok' : 'warn'}">${name}</div>`
+  ).join('');
+}
+
+// ── Boot: check health ─────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  fetch('/api/health')
+    .then(r => r.json())
+    .then(updateStatusDots)
+    .catch(() => {});
+
+  // Brand toggle (collapsible)
+  document.getElementById('brand-toggle').addEventListener('click', () => {
+    const header = document.getElementById('brand-toggle');
+    const body   = document.getElementById('brand-body');
+    header.classList.toggle('open');
+    body.classList.toggle('open');
+  });
+
+  // Custom voice
+  document.getElementById('brand_voice').addEventListener('change', function() {
+    document.getElementById('custom-voice-wrap').style.display =
+      this.value === 'custom' ? 'block' : 'none';
+  });
+
+  // Platform chip toggles
+  document.querySelectorAll('.platform-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const cb = chip.querySelector('input[type=checkbox]');
+      chip.classList.toggle('active');
+      cb.checked = chip.classList.contains('active');
+      if (chip.dataset.platform === 'blog') {
+        document.getElementById('blog-config').style.display =
+          cb.checked ? 'block' : 'none';
+      }
+    });
+  });
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function getBrandConfig() {
+  const voice = document.getElementById('brand_voice').value;
+  return {
+    brand_name:      document.getElementById('brand_name').value.trim(),
+    brand_voice:     voice === 'custom'
+                       ? document.getElementById('custom_voice').value.trim()
+                       : voice,
+    persona:         document.getElementById('persona').value.trim(),
+    target_audience: document.getElementById('target_audience').value.trim(),
+    cta:             document.getElementById('cta').value.trim(),
+    website:         document.getElementById('website').value.trim(),
+  };
+}
+
+function getSelectedPlatforms() {
+  return [...document.querySelectorAll('.platform-chip input:checked')]
+    .map(cb => cb.value);
+}
+
+function setLoading(btnId, loading, label) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = loading;
+  btn.innerHTML = loading
+    ? `<span class="spinner"></span>${label}`
+    : label;
+}
+
+function showToast(msg, type = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `show ${type}`;
+  setTimeout(() => t.className = '', 3500);
+}
+
+function updateCounter(textarea, counterId, max) {
+  const el = document.getElementById(counterId);
+  const len = textarea.value.length;
+  el.textContent = max ? `${len} / ${max}` : `${len} chars`;
+  el.className = 'char-counter' + (len > max * .9 ? ' warn' : '') + (len > max ? ' over' : '');
+}
+
+function switchTab(key, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`tab-${key}`).classList.add('active');
+  btn.classList.add('active');
+}
+
+function toggleSchedule() {
+  const on = document.getElementById('schedule-toggle').checked;
+  document.getElementById('schedule-field').style.display = on ? 'block' : 'none';
+}
+
+function fillPreviews(content) {
+  const map = {
+    'linkedin_personal': content.linkedin_personal || '',
+    'linkedin_agency':   content.linkedin_agency   || '',
+    'twitter':           content.twitter           || '',
+    'instagram':         content.instagram         || '',
+    'blog_content':      content.blog_content      || '',
+    'blog_title':        content.blog_title        || '',
+  };
+  for (const [key, val] of Object.entries(map)) {
+    const el = document.getElementById(`ct-${key}`);
+    if (el) { el.value = val; el.dispatchEvent(new Event('input')); }
+  }
+  // Image
+  if (content.image_url) {
+    const img = document.getElementById('preview-img');
+    img.src = content.image_url;
+    img.style.display = 'block';
+    document.getElementById('img-placeholder').style.display = 'none';
+  } else {
+    document.getElementById('img-placeholder').innerHTML =
+      '<span class="ph-icon">⚠️</span>Image unavailable';
+  }
+}
+
+// ── Generate ──────────────────────────────────────────────────────────────
+async function generateContent() {
+  const topic = document.getElementById('topic').value.trim();
+  if (!topic) { showToast('Please enter a topic first', 'err'); return; }
+
+  setLoading('generate-btn', true, 'Generating…');
+  document.getElementById('preview-section').style.display = 'none';
+  document.getElementById('post-section').style.display    = 'none';
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('img-placeholder').innerHTML =
+    '<span class="ph-icon">🖼</span>Generating AI image…';
+  document.getElementById('preview-img').style.display = 'none';
+
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, ...getBrandConfig() }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Generation failed');
+
+    currentContentId = data.content_id;
+    fillPreviews(data.content);
+
+    document.getElementById('preview-section').style.display = 'block';
+    document.getElementById('post-section').style.display    = 'block';
+    document.getElementById('preview-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    showToast('Content generated! Review and edit before posting.', 'ok');
+  } catch (e) {
+    showToast(e.message, 'err');
+  } finally {
+    setLoading('generate-btn', false, '✦ Generate Content');
+  }
+}
+
+// ── Post ──────────────────────────────────────────────────────────────────
+async function postContent() {
+  if (!currentContentId) { showToast('Generate content first', 'err'); return; }
+  const platforms = getSelectedPlatforms();
+  if (!platforms.length) { showToast('Select at least one platform', 'err'); return; }
+
+  setLoading('post-btn', true, 'Posting…');
+
+  // Collect user edits
+  const overrides = {
+    linkedin_personal: document.getElementById('ct-linkedin_personal').value,
+    linkedin_agency:   document.getElementById('ct-linkedin_agency').value,
+    twitter:           document.getElementById('ct-twitter').value,
+    instagram:         document.getElementById('ct-instagram').value,
+    blog_title:        document.getElementById('ct-blog_title').value,
+    blog_content:      document.getElementById('ct-blog_content').value,
+  };
+
+  // Schedule time
+  let scheduleTime = null;
+  if (document.getElementById('schedule-toggle').checked) {
+    const raw = document.getElementById('schedule-time').value;
+    if (raw) scheduleTime = new Date(raw).toISOString();
+  }
+
+  // Blog config
+  const blogConfig = {
+    url:      document.getElementById('wp_url').value.trim(),
+    username: document.getElementById('wp_user').value.trim(),
+    password: document.getElementById('wp_pass').value.trim(),
+  };
+
+  try {
+    const res = await fetch('/api/post', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content_id:      currentContentId,
+        platforms,
+        overrides,
+        schedule_time:   scheduleTime,
+        blog_config:     blogConfig,
+        telegram_notify: document.getElementById('telegram-toggle').checked,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Post failed');
+
+    renderResults(data.results);
+    showToast('Done! Check results below.', 'ok');
+  } catch (e) {
+    showToast(e.message, 'err');
+  } finally {
+    setLoading('post-btn', false, '🚀 Post to Selected Platforms');
+  }
+}
+
+// ── Render results ────────────────────────────────────────────────────────
+const LABELS = {
+  linkedin_personal: '💼 LinkedIn Personal',
+  linkedin_agency:   '🏢 LinkedIn Brand',
+  twitter:           '𝕏 Twitter / X',
+  instagram:         '📸 Instagram',
+  youtube:           '▶ YouTube',
+  blog:              '📝 Blog / WordPress',
+};
+
+function renderResults(results) {
+  const list = document.getElementById('results-list');
+  list.innerHTML = Object.entries(results).map(([key, val]) => {
+    const label = LABELS[key] || key;
+    const isOk   = val.startsWith('queued') || val.startsWith('published');
+    const isSkip = val.startsWith('skipped');
+    const cls    = isOk ? 'ok' : isSkip ? 'skip' : 'fail';
+    const badge  = isOk ? '✓ ' + val : isSkip ? '⏭ skipped' : '✗ ' + val;
+    return `<div class="result-row">
+      <span class="result-label">${label}</span>
+      <span class="result-badge ${cls}">${badge}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('results-section').style.display = 'block';
+  document.getElementById('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+</body>
+</html>
