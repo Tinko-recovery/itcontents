@@ -14,7 +14,10 @@ DB_PATH = Path(__file__).parent / "content_ai.db"
 def get_db():
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")   # safe for concurrent Flask workers
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+    except sqlite3.OperationalError:
+        pass  # already set by another process — safe to ignore
     return conn
 
 
