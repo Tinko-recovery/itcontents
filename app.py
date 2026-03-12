@@ -193,7 +193,7 @@ def landing():
         plans=PLANS,
         razorpay_key=RAZORPAY_KEY_ID,
         current_user=db_user,
-        user_json=json.dumps(db_user) if db_user else "null",
+        user_json=json.dumps(db_user, default=str) if db_user else "null",
     )
 
 
@@ -209,9 +209,12 @@ def login():
             "name":    "Dev User",
             "picture": "",
         }
-        upsert_user(session["user"])
-        if SKIP_PAYMENT:
-            activate_plan("dev|testuser", "pro", "dev_skip")
+        try:
+            upsert_user(session["user"])
+            if SKIP_PAYMENT:
+                activate_plan("dev|testuser", "pro", "dev_skip")
+        except Exception as e:
+            print(f"DB not ready yet (dev login): {e}")
         return redirect(url_for("index"))
 
     next_url = request.args.get("next", "")
