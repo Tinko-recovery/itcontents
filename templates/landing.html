@@ -146,13 +146,23 @@ footer{text-align:center;padding:32px 20px;border-top:1px solid var(--border);
 
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-badge">✦ Semi-Automated Bypass Mode Active</div>
-  <h1>Direct access to the<br><span>Content Generator Engine</span></h1>
-  <p>You are in operator mode. Skip the marketing and jump straight into generating content for your customers.</p>
-  <div class="hero-buttons">
-    <a href="/"><button class="btn-hero btn-hero-primary">Enter Engine Dashboard →</button></a>
-    <a href="#how"><button class="btn-hero btn-hero-secondary">View Docs</button></a>
-  </div>
+  {% if not config_auth0 and config_skip_payment %}
+    <div class="hero-badge">✦ Semi-Automated Bypass Mode Active</div>
+    <h1>Direct access to the<br><span>Content Generator Engine</span></h1>
+    <p>You are in operator mode. Skip the marketing and jump straight into generating content for your customers.</p>
+    <div class="hero-buttons">
+      <a href="/"><button class="btn-hero btn-hero-primary">Enter Engine Dashboard →</button></a>
+      <a href="#how"><button class="btn-hero btn-hero-secondary">View Docs</button></a>
+    </div>
+  {% else %}
+    <div class="hero-badge">✦ Powered by Claude + GPT-4</div>
+    <h1>Turn any topic into<br><span>content for every platform</span></h1>
+    <p>Type a topic. Get publication-ready LinkedIn posts, tweets, Instagram captions, a full blog article, and an AI image — all in one click.</p>
+    <div class="hero-buttons">
+      <a href="/login"><button class="btn-hero btn-hero-primary">Start Free Trial →</button></a>
+      <a href="#how"><button class="btn-hero btn-hero-secondary">See How It Works</button></a>
+    </div>
+  {% endif %}
 </section>
 
 <!-- PLATFORMS -->
@@ -251,26 +261,13 @@ footer{text-align:center;padding:32px 20px;border-top:1px solid var(--border);
           <li>{{ f }}</li>
         {% endfor %}
       </ul>
-      <button class="btn-plan btn-plan-secondary"
-              onclick="startPayment('starter')">
-        Get Starter
-      </button>
-    </div>
-
-    <div class="plan-card highlight">
-      <div class="plan-badge">Most Popular</div>
-      <div class="plan-name">Pro</div>
-      <div class="plan-price">{{ plans.pro.inr }}<small>{{ plans.pro.period }}</small></div>
-      <div class="plan-usd">≈ {{ plans.pro.usd }}</div>
-      <div class="plan-divider"></div>
-      <ul class="plan-features">
-        {% for f in plans.pro.features %}
-          <li>{{ f }}</li>
-        {% endfor %}
-      </ul>
-      <button class="btn-plan btn-plan-primary"
-              onclick="startPayment('pro')">
-        Get Pro
+      <button class="btn-plan {% if loop.index0 == 1 %}btn-plan-primary{% else %}btn-plan-secondary{% endif %}"
+              onclick="{% if not config_auth0 and config_skip_payment %}window.location.href='/'{% else %}startPayment('{{ plan_key }}'){% endif %}">
+        {% if not config_auth0 and config_skip_payment %}
+          Enter Generator Engine
+        {% else %}
+          Get {{ plan.name }}
+        {% endif %}
       </button>
     </div>
 
