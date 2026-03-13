@@ -261,12 +261,33 @@ footer{text-align:center;padding:32px 20px;border-top:1px solid var(--border);
           <li>{{ f }}</li>
         {% endfor %}
       </ul>
-      <button class="btn-plan {% if loop.index0 == 1 %}btn-plan-primary{% else %}btn-plan-secondary{% endif %}"
-              onclick="{% if not config_auth0 and config_skip_payment %}window.location.href='/'{% else %}startPayment('{{ plan_key }}'){% endif %}">
+      <button class="btn-plan btn-plan-secondary"
+              onclick="{% if not config_auth0 and config_skip_payment %}window.location.href='/'{% else %}startPayment('starter'){% endif %}">
         {% if not config_auth0 and config_skip_payment %}
           Enter Generator Engine
         {% else %}
-          Get {{ plan.name }}
+          Get Starter
+        {% endif %}
+      </button>
+    </div>
+
+    <div class="plan-card highlight">
+      <div class="plan-badge">Most Popular</div>
+      <div class="plan-name">Pro</div>
+      <div class="plan-price">{{ plans.pro.inr }}<small>{{ plans.pro.period }}</small></div>
+      <div class="plan-usd">≈ {{ plans.pro.usd }}</div>
+      <div class="plan-divider"></div>
+      <ul class="plan-features">
+        {% for f in plans.pro.features %}
+          <li>{{ f }}</li>
+        {% endfor %}
+      </ul>
+      <button class="btn-plan btn-plan-primary"
+              onclick="{% if not config_auth0 and config_skip_payment %}window.location.href='/'{% else %}startPayment('pro'){% endif %}">
+        {% if not config_auth0 and config_skip_payment %}
+          Enter Generator Engine
+        {% else %}
+          Get Pro
         {% endif %}
       </button>
     </div>
