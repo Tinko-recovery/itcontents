@@ -190,6 +190,10 @@ def index():
 
 @app.route("/landing")
 def landing():
+    # In bypass mode, visitors should go straight to the app
+    if not os.getenv("AUTH0_DOMAIN") and os.getenv("SKIP_PAYMENT", "false").lower() == "true":
+        return redirect(url_for("index"))
+
     user = current_user()
     db_user = get_user(user["id"]) if user else None
     return render_template(
@@ -198,6 +202,8 @@ def landing():
         razorpay_key=RAZORPAY_KEY_ID,
         current_user=db_user,
         user_json=json.dumps(db_user, default=str) if db_user else "null",
+        config_auth0=bool(AUTH0_DOMAIN),
+        config_skip_payment=SKIP_PAYMENT,
     )
 
 
