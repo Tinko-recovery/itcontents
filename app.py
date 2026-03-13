@@ -620,6 +620,16 @@ def admin_cancel():
 
 
 # ── Dev server ────────────────────────────────────────────────────────────────
+@app.route("/api/debug-vars")
+def debug_vars():
+    return jsonify({
+        "AUTH0_DOMAIN": os.getenv("AUTH0_DOMAIN"),
+        "SKIP_PAYMENT": os.getenv("SKIP_PAYMENT"),
+        "SKIP_PAYMENT_BOOL": os.getenv("SKIP_PAYMENT", "false").lower() == "true",
+        "AUTH0_DOMAIN_BOOL": bool(os.getenv("AUTH0_DOMAIN")),
+    })
+
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5050))
     print(f"\n  ContentAI  →  http://localhost:{port}")
