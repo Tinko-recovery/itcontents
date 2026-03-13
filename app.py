@@ -175,6 +175,10 @@ def _build_poster_for_user(user_id: str) -> BufferPoster:
 
 @app.route("/")
 def index():
+    # If in bypass/dev mode and no session, auto-login via the dev logic in /login
+    if not os.getenv("AUTH0_DOMAIN") and os.getenv("SKIP_PAYMENT", "false").lower() == "true" and not current_user():
+        return redirect(url_for("login"))
+
     user = current_user()
     if not user:
         return redirect(url_for("landing"))
